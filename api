@@ -1,0 +1,5242 @@
+Transactions
+DELETE
+/user/core/v1/transactions
+Delete a list of transactions
+GET
+/user/core/v1/transactions
+Get a list of transactions
+Parameters
+Name Description
+sort
+string
+(query)
+Decides the order of the returned transactions, defined by a comma-separated list of the
+properties of the Transaction object. The sort order for each sort field is ascending unless it is
+prefixed with a "
+-
+" in which case it is descending. If this string is null or empty then 'OrderBy' is
+used.
+The supported Transaction fields are: AccountId, Accuracy, Amount, AmountInCurrency,
+Balance,BankId, CategoryChangedTime, CategoryId, Date, DueDate,
+HasUserClearedCategoryUncertainty, Id, IsFlagged,IsMerchant, IsOwnAccountTransfer,
+IsRead, IsSplitChild, IsUncleared, InsertTime, Mcc, MerchantId, ParentIdentifier, Text,
+Timestamp, CounterpartyAccountIdentifier, Currency, HasUncertainCategorization,
+OriginalAmount, OriginalDate, OriginalText The string "Date,Text,
+-Amount,BankId" results in the
+transactions being sorted by Date ascending, Text ascending, Amount descending and BankId
+ascending.
+sort
+accountIds
+string
+(query)
+A comma-separated string of account Ids to filter by
+accountIds
+accountIdentifiers
+string
+(query)
+A comma-separated string of account identifiers to filter by
+accountIdentifiers
+counterpartyAccountIdentifiers
+string
+(query)
+A comma-separated string of counterparty account identifiers (who person is paying) to filter by
+counterpartyAccountIdentifiers
+categoryIds
+string
+(query)
+A comma-separated string of category Ids to filter by. If a negative categoryId is provided, all
+transactions in categories where the parentCategoryId matches the given categoryId are found.
+categoryIds
+categoryTypes
+string
+(query)
+A comma-separated string of category types to filter by. An enum of the category type are
+defined in the "GET /user/core/v1/categories/types" endpoint.
+categoryTypes
+onlyUnread
+boolean
+(query)
+Whether or not to only get unread transactions
+--
+onlyFlagged
+boolean
+(query)
+Whether or not to only get flagged transactions
+--
+withFlagState
+string
+(query)
+Flag state to filter by: "Flagged" : Transaction.IsFlagged is true,
+"NotFlagged" :
+Transaction.IsFlagged is false or null,
+"UnFlagged" : Transaction.IsFlagged is false,
+"NeverFlagged" : Transaction.IsFlagged is null
+withFlagState
+onlyUncertain
+boolean
+(query)
+Whether or not to only get transactions with uncertain categorization
+--
+onlyUncategorized
+boolean
+(query)
+Whether or not to only get uncategorized transactions
+--
+onlyUncleared
+boolean
+(query)
+Whether or not to only get uncleared transactions
+--
+onlyCleared
+boolean
+(query)
+Whether or not to exclude uncleared transactions
+--
+uncertainOrFlagged
+boolean
+(query)
+Whether or not to get uncertain categorization or flagged transactions
+--
+hideExcluded
+boolean
+(query)
+Whether or not to hide transactions in a excluded category
+--
+includeHiddenAccounts
+boolean
+(query)
+Whether or not to include transactions from hidden accounts, default true
+--
+timestampFrom
+string($date-time)
+(query)
+The inclusive timestamp to search from (YYYY-MM-DD)
+timestampFrom
+timestampTo
+string($date-time)
+(query)
+The exclusive timestamp to search to (YYYY-MM-DD)
+timestampTo
+insertedBefore
+string($date-time)
+(query)
+If set, will only return transactions that have insert time before the supplied value
+insertedBefore
+periodFrom
+string($date-time)
+(query)
+The inclusive sub-date to search from (YYYY-MM-DD)
+periodFrom
+periodTo
+string($date-time)
+(query)
+The exclusive sub-date to search to (YYYY-MM-DD)
+periodTo
+originalPeriodFrom
+string($date-time)
+(query)
+The inclusive date to search from (YYYY-MM-DD)
+originalPeriodFrom
+originalPeriodTo
+string($date-time)
+(query)
+The exclusive date to search to (YYYY-MM-DD)
+originalPeriodTo
+amountFrom
+number($double)
+(query)
+The amount to search from
+amountFrom
+amountTo
+number($double)
+(query)
+The amount to search to
+amountTo
+searchText
+string
+(query)
+A free-form text to filter by that searches through transaction's text, original text, amount,
+currency, merchant name, category name, category synonyms, tags and comments
+searchText
+searchTextFields
+string
+(query)
+A comma-separated string of fields in which the searchText value will be searched.
+Allowed values: text, originalText, amount, currency, category, tags, comments, and keys from
+parsedData with the "parsedData.
+" prefix (e.g., to search in the budgetType field of parsedData,
+use "parsedData.budgetType"). If the parameter is null or empty, all fields will be searched: text,
+originalText, amount, currency, category, tags, comments.
+searchTextFields
+description
+string
+(query)
+The transaction description to filter by. If it's null, it will be ignored. But it is possible to search for
+empty descriptions.
+description
+currency
+string
+(query)
+The transaction currency to filter by. If it's null or empty, it will be ignored.
+currency
+comment
+string
+(query)
+The transaction comment to filter by. If it's null, it will be ignored. But it is possible to search for
+empty comments.
+comment
+tags
+string
+(query)
+A comma-separated string of tags to filter by
+tags
+orderBy
+string
+(query)
+The order of the returned transactions.
+Available values : ByDate, ByText, ByAmount, ByCategory, ByParsedData, ByOriginalDate
+--
+parsedDataNameToOrderBy
+string
+(query)
+The parsed data parameter to order by when OrderBy ==
+Meniga.Core.Api.Models.TransactionFilterOrderEnum.ByParsedData.
+parsedDataNameToOrderBy
+ascendingOrder
+boolean
+(query)
+Whether or not to order the returned transactions in an ascending order. The order is specified
+by Meniga.Core.Api.Models.TransactionFilterModel.OrderBy If nothing is specified, then the list
+will be ordered by date.
+--
+useAbsoluteAmountSearch
+boolean
+(query)
+Whether or not to use absolute amount search. If true, AmountFrom = 500 and AmountTo =
+1000 searches from -1000 to -500 as well as +500 to + 1000
+--
+useAndSearchForTags
+boolean
+(query)
+Whether or not tags are searched with AND or OR. If true, tags are searched with AND so the
+transactions returned will have to contain all the
+Meniga.Core.Api.Models.TransactionFilterModel.Tags.
+--
+useEqualsSearchForBankId
+boolean
+(query)
+Whether or not BankIds is searched with EQUALS or LIKE. If true, exact matches are found,
+otherwise matches that contain the search string for BankIds.
+--
+useAmountInCurrencySearch
+boolean
+(query)
+DEPRECATED: Use Meniga.Core.Api.Models.TransactionFilterModel.UseAmountFields instead
+Whether or not to search for amount in currency instead of amount
+--
+useExactDescription
+boolean
+(query)
+If true, filters by exact (equals) description as opposed to contains (which is the default)
+--
+useExactMerchantTexts
+boolean
+(query)
+If true, filters by exact (equals) merchant texts as opposed to contains (which is the default)
+--
+useAccentInsensitiveSearch
+boolean
+(query)
+Whether the search performed is accent insensitive or not
+--
+useKeywordsFromSearchText
+boolean
+(query)
+Whether resources are searched by Search Text split into keywords on " " with logical AND
+between keywords.
+--
+includeChildCategoriesForParentWhenUsingSearchText
+boolean
+(query)
+Whether the search should also return transactions with child categories when user searches
+for parent category
+--
+merchantIds
+string
+(query)
+A comma-separated string of merchant Ids to filter by
+merchantIds
+excludeMerchantIds
+string
+(query)
+A comma-separated string of merchant Ids to exclude
+excludeMerchantIds
+merchantTexts
+string
+(query)
+A comma-separated string of merchant texts to filter by
+merchantTexts
+isMerchant
+boolean
+(query)
+Flag that helps to filter transactions based on IsMerchant property
+--
+parsedData
+string
+(query)
+The transaction data to filter by. The data is filtered with union semantics (OR) example:
+[{"key":"reference"
+,
+"value":"ref123"},{"key":"reference"
+,
+"value":"ref124"}] will find transactions
+with "ref123" OR "ref124" transaction data.
+parsedData
+useAndSearchForParsedData
+boolean
+(query)
+If true, then all the fields passed as
+Meniga.Core.Api.Models.TransactionFilterModel.ParsedData will be AND-ed together. If the
+same key appears more than once then they will be OR-ed together and AND-ed with the other
+keys. If false, they will be OR-ed together. Example: Given ParsedData:
+(Key=X,Value=x1),(Key=X,Value=x2),(Key=Y,Value=y1) When true: (X=x1 OR X=x2) AND Y=y1
+When false: X=x1 OR X=x2 OR Y=y1
+--
+parsedDataExactKeys
+string
+(query)
+List of keys in parsed data that should only return a match if the value is exactly the same as
+supplied in ParsedData
+parsedDataExactKeys
+useParentMerchantIds
+boolean
+(query)
+If set to true, parent and the parents children will be found for each merchant id provided in
+Meniga.Core.Api.Models.TransactionFilterModel.MerchantIds and in
+Meniga.Core.Api.Models.TransactionFilterModel.ExcludeMerchantIds and they included in the
+filter. If the merchant has no parent then its children, if any, are added
+--
+excludeMerchantTexts
+string
+(query)
+A comma-separated string of merchant texts to exclude
+excludeMerchantTexts
+bankIds
+string
+(query)
+A comma-separated string of bank Ids to filter by
+bankIds
+ids
+string
+(query)
+A comma-separated string of transaction Ids to filter by
+ids
+useAmountFields
+string
+(query)
+This is a comma-separated string of transactionAmountField values that specifies which amount
+fields to use when searching using amountFrom and amountTo. If useAmountInCurrencySearch
+= true then only transactionAmountField.amountInCurrency is used. If
+useAmountInCurrencySearch = false then this list is used. If the list is empty then
+transactionAmountField.amount is used. Valid values are "amount" (0),
+"originalAmount" (1),
+"amountInCurrency" (2), and "bookedAmount" (3)
+useAmountFields
+externalMerchantIdentifiers
+string
+(query)
+A comma-separated string of external merchant identifiers on transactions
+externalMerchantIdentifiers
+merchantConnectorIds
+string
+(query)
+A comma-separated string of merchant connector ids.
+merchantConnectorIds
+merchantCategoryCodes
+string
+(query)
+A comma-separated string of merchant category codes ( MCC ).
+merchantCategoryCodes
+descriptions
+string
+(query)
+A comma-separated string of transaction descriptions to filter by. If it's null or empty, it will be
+ignored. Searching for empty descriptions is possible. If this property is set and is not empty,
+then the Meniga.Core.Api.Models.TransactionFilterModel.Description property will be ignored
+regardless of its value.
+descriptions
+useOriginalDescription
+boolean
+(query)
+If true, filters by the original description (transaction text from bank).
+--
+excludedParsedData
+string
+(query)
+The transaction data to filter by. The data is filtered with union semantics NOT(x1=y1 OR x2=y2)
+example: [{"key":"reference"
+,
+"value":"ref123"},{"key":"reference"
+,
+"value":"ref124"}] will find
+transactions with DO NOT HAVE EITHER "ref123" OR "ref124" in the "reference" field in
+transaction data.
+excludedParsedData
+excludeCounterpartyAccountIdentifiers
+string
+(query)
+A comma-separated string of counterparty account identifiers (who person is paying) to exclude
+excludeCounterpartyAccountIdentifiers
+fields
+string
+(query)
+A comma separated list of what fields should be returned, if null, returns all fields.
+fields
+skip
+integer($int32)
+(query)
+How many transactions should be skipped
+Default value : 0
+0
+take
+integer($int32)
+(query)
+How many transactions should be fetched. If null, returns 1000.
+Default value : 1000
+1000
+include
+string
+(query)
+Tells which related resources should be included in the response as 'included' data. Supported
+resources are "Account"
+,
+"Merchant" and "Tag"
+, e.g.
+"Account,Merchant" to get both resources
+included
+include
+includeDisabledAccounts
+boolean
+(query)
+Whether or not to include transactions from disabled accounts in the result, defaults to 'false'
+Default value : false
+false
+includeHiddenAccounts
+boolean
+(query)
+Whether or not to include transactions from hidden accounts, default true
+--
+includeCarbonFootprint
+boolean
+(query)
+Whether or not to include the CO2 footprint of the transaction
+Default value : false
+false
+includeChildMerchants
+boolean
+(query)
+Pass true if you want to have Merchant.ChildMerchants populated with child merchants if any
+Default value : false
+false
+pageToken
+string
+(query)
+A pageToken meta property returned by the previous call if more transactions pages are
+available
+pageToken
+includeSummary
+boolean
+(query)
+Pass true if you would like totalCount and totalAmount to be returned as metadata
+--
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"accountId": 0,
+"amount": 0,
+"amountInCurrency": 0,
+"balance": 0,
+"bankId": "string"
+,
+"bookedAmount": 0,
+"carbonFootprint": 0,
+"categoryChangedTime": "2026-03-18T15:17:39.991Z"
+,
+"categoryId": 0,
+"changedByRule": 0,
+"changedByRuleTime": "2026-03-18T15:17:39.992Z"
+,
+"comments": [
+{
+"comment": "string"
+,
+"createdDate": "2026-03-18T15:17:39.992Z"
+,
+"id": 0,
+"modifiedDate": "2026-03-18T15:17:39.992Z"
+,
+"personId": 0
+}
+],
+"counterpartyAccountIdentifier": "string"
+,
+"countryCode": "string"
+,
+"currency": "string"
+,
+"data": "string"
+,
+"dataFormat": 0,
+"date": "2026-03-18T15:17:39.992Z"
+,
+"detectedCategories": [
+{
+"categoryId": 0,
+"score": 0
+}
+],
+"dueDate": "2026-03-18T15:17:39.992Z"
+,
+"hasUncertainCategorization": true,
+"hasUserClearedCategoryUncertainty": true,
+"id": 0,
+"insertTime": "2026-03-18T15:17:39.992Z"
+,
+"isFlagged": true,
+"isMerchant": true,
+"isRead": true,
+"isSplitChild": true,
+"isUncleared": true,
+"lastModifiedTime": "2026-03-18T15:17:39.992Z"
+,
+"mcc": 0,
+"merchantId": 0,
+"metaData": [
+{
+"name": "string"
+,
+"value": "string"
+}
+],
+"originalAmount": 0,
+"originalDate": "2026-03-18T15:17:39.992Z"
+,
+"originalText": "string"
+,
+"parentIdentifier": "string"
+,
+"parsedData": [
+{
+"key": "string"
+,
+"value": "string"
+}
+],
+"splitRatio": 0,
+"tags": [
+"string"
+],
+"text": "string"
+,
+"timestamp": "2026-03-18T15:17:39.992Z"
+,
+"userData": "string"
+}
+],
+"included": {
+"accounts": [
+{
+"accountAuthorizationType": "string"
+,
+"accountCategory": "string"
+,
+"accountCategoryDetails": "string"
+,
+"accountClass": "string"
+,
+"accountIdentifier": "string"
+,
+"accountRoleExternal": "string"
+,
+"accountStatusExternal": "string"
+,
+"accountTypeId": 0,
+"attachedToUserDate": "2026-03-18T15:17:39.992Z"
+,
+"balance": 0,
+"balanceInUserCurrency": 0,
+"balances": [
+{
+"amount": 0,
+"currency": "string"
+,
+"date": "2026-03-18T15:17:39.992Z"
+,
+"type": "string"
+}
+],
+"createDate": "2026-03-18T15:17:39.992Z"
+,
+"currencyCode": "string"
+,
+"emergencyFundBalanceLimit": 0,
+"id": 0,
+"inactive": true,
+"isDisabled": true,
+"isHidden": true,
+"isImportAccount": true,
+"lastUpdate": "2026-03-18T15:17:39.992Z"
+,
+"limit": 0,
+"limitInUserCurrency": 0,
+"metadata": [
+{
+"name": "string"
+,
+"value": "string"
+}
+],
+"name": "string"
+,
+"orderId": 0,
+"organizationIdentifier": "string"
+,
+"organizationName": "string"
+,
+"personId": 0,
+"productName": "string"
+,
+"realmCredentialsId": 0,
+"realmIdentifier": "string"
+}
+],
+"merchants": [
+{
+"address": "string"
+,
+"categoryScores": [
+{
+"categoryId": 0,
+"score": 0
+}
+],
+"childMerchants": [
+"string"
+],
+"customAttributes": {
+"additionalProp1": [
+"string"
+],
+"additionalProp2": [
+"string"
+],
+"additionalProp3": [
+"string"
+]
+},
+"detectedCategory": [
+{
+"categoryId": 0,
+"score": 0
+}
+],
+"directoryLink": "string"
+,
+"email": "string"
+,
+"id": 0,
+"identifier": "string"
+,
+"masterIdentifier": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+,
+"merchantCategoryIdentifier": "string"
+,
+"name": "string"
+,
+"offersLink": "string"
+,
+"parentId": 0,
+"parentMerchant": "string"
+,
+"parentName": "string"
+,
+"publicIdentifier": "string"
+,
+"telephone": "string"
+,
+"webpage": "string"
+}
+],
+"tags": [
+{
+"createdDate": "2026-03-18T15:17:39.992Z"
+,
+"id": 0,
+"lastUsedDate": "2026-03-18T15:17:39.992Z"
+"metadata": [
+{
+,
+"name": "string"
+,
+"value": "string"
+}
+],
+"modifiedDate": "2026-03-18T15:17:39.992Z"
+"name": "string"
+,
+"transactionCount": 0
+,
+}
+]
+},
+"meta": {
+"pageToken": "string"
+,
+"totalAmount": 0,
+"totalCount": 0
+}
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+POST
+/user/core/v1/transactions
+Create a transaction
+PUT
+/user/core/v1/transactions
+Update a list of transactions
+POST
+/user/core/v1/transactions/comments
+Create a comment for a list of transaction ids. If the comment contains any tags (words starting
+with '#') they are automatically created and associated with these transaction if they do not
+already exist.
+POST
+/user/core/v1/transactions/recategorize
+Recategorize transactions by a list of transaction texts
+GET
+/user/core/v1/transactions/rules
+Get all transaction rules for the user
+Parameters
+No parameters
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"acceptAction": true,
+"accountCategoryCriteria": "string"
+,
+"amountCriteria": 0,
+"amountLimitSignCriteria": 0,
+"amountLimitTypeCriteria": 0,
+"categoryIdAction": 0,
+"commentAction": "string"
+,
+"createdDate": "2026-03-18T15:17:39.997Z"
+,
+"dateMatchTypeCriteria": 0,
+"daysLimitCriteria": 0,
+"flagAction": true,
+"id": 0,
+"modifiedDate": "2026-03-18T15:17:39.997Z"
+,
+"monthShiftAction": 0,
+"name": "string"
+,
+"removeAction": true,
+"splitActions": [
+{
+"amount": 0,
+"categoryId": 0,
+"id": 0,
+"ratio": 0,
+"transactionRuleId": 0
+}
+],
+"tagAction": "string"
+,
+"textAction": "string"
+,
+"textCriteria": "string"
+,
+"textCriteriaOperatorType": 0,
+"userId": 0
+}
+]
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+POST
+/user/core/v1/transactions/rules
+Create a transaction rule
+DELETE
+/user/core/v1/transactions/rules/{id}
+Delete a transaction rule
+GET
+/user/core/v1/transactions/rules/{id}
+Get a transaction rule
+Parameters
+Name Description
+id *
+integer($int32)
+(path)
+The Id of the transaction rule
+id
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": {
+"acceptAction": true,
+"accountCategoryCriteria": "string"
+,
+"amountCriteria": 0,
+"amountLimitSignCriteria": 0,
+"amountLimitTypeCriteria": 0,
+"categoryIdAction": 0,
+"commentAction": "string"
+,
+"createdDate": "2026-03-18T15:17:40.000Z"
+,
+"dateMatchTypeCriteria": 0,
+"daysLimitCriteria": 0,
+"flagAction": true,
+"id": 0,
+"modifiedDate": "2026-03-18T15:17:40.000Z"
+,
+"monthShiftAction": 0,
+"name": "string"
+,
+"removeAction": true,
+"splitActions": [
+{
+"amount": 0,
+"categoryId": 0,
+"id": 0,
+"ratio": 0,
+"transactionRuleId": 0
+}
+],
+"tagAction": "string"
+,
+"textAction": "string"
+,
+"textCriteria": "string"
+,
+"textCriteriaOperatorType": 0,
+"userId": 0
+}
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+PUT
+/user/core/v1/transactions/rules/{id}
+Update a transaction rule
+POST
+/user/core/v1/transactions/series
+Get a series of transactions aggregated over time
+GET
+/user/core/v1/transactions/suggestions
+Search for categories, tags, comments, descriptions, currencies and merchants that match the
+search text
+Parameters
+Name Description
+sort
+string
+(query)
+Decides the order of the returned transactions, defined by a comma-separated list of the
+properties of the Transaction object. The sort order for each sort field is ascending unless it is
+prefixed with a "
+-
+" in which case it is descending. If this string is null or empty then 'OrderBy' is
+used.
+The supported Transaction fields are: AccountId, Accuracy, Amount, AmountInCurrency,
+Balance,BankId, CategoryChangedTime, CategoryId, Date, DueDate,
+HasUserClearedCategoryUncertainty, Id, IsFlagged,IsMerchant, IsOwnAccountTransfer,
+IsRead, IsSplitChild, IsUncleared, InsertTime, Mcc, MerchantId, ParentIdentifier, Text,
+Timestamp, CounterpartyAccountIdentifier, Currency, HasUncertainCategorization,
+OriginalAmount, OriginalDate, OriginalText The string "Date,Text,
+-Amount,BankId" results in the
+transactions being sorted by Date ascending, Text ascending, Amount descending and BankId
+ascending.
+sort
+accountIds
+string
+(query)
+A comma-separated string of account Ids to filter by
+accountIds
+accountIdentifiers
+string
+(query)
+A comma-separated string of account identifiers to filter by
+accountIdentifiers
+counterpartyAccountIdentifiers
+string
+(query)
+A comma-separated string of counterparty account identifiers (who person is paying) to filter by
+counterpartyAccountIdentifiers
+categoryIds
+string
+(query)
+A comma-separated string of category Ids to filter by. If a negative categoryId is provided, all
+transactions in categories where the parentCategoryId matches the given categoryId are found.
+categoryIds
+categoryTypes
+string
+(query)
+A comma-separated string of category types to filter by. An enum of the category type are
+defined in the "GET /user/core/v1/categories/types" endpoint.
+categoryTypes
+onlyUnread
+boolean
+(query)
+Whether or not to only get unread transactions
+--
+onlyFlagged
+boolean
+(query)
+Whether or not to only get flagged transactions
+--
+withFlagState
+string
+(query)
+Flag state to filter by: "Flagged" : Transaction.IsFlagged is true,
+"NotFlagged" :
+Transaction.IsFlagged is false or null,
+"UnFlagged" : Transaction.IsFlagged is false,
+"NeverFlagged" : Transaction.IsFlagged is null
+withFlagState
+onlyUncertain
+boolean
+(query)
+Whether or not to only get transactions with uncertain categorization
+--
+onlyUncategorized
+boolean
+(query)
+Whether or not to only get uncategorized transactions
+--
+onlyUncleared
+boolean
+(query)
+Whether or not to only get uncleared transactions
+--
+onlyCleared
+boolean
+(query)
+Whether or not to exclude uncleared transactions
+--
+uncertainOrFlagged
+boolean
+(query)
+Whether or not to get uncertain categorization or flagged transactions
+--
+hideExcluded
+boolean
+(query)
+Whether or not to hide transactions in a excluded category
+--
+includeHiddenAccounts
+boolean
+(query)
+Whether or not to include transactions from hidden accounts, default true
+--
+timestampFrom
+string($date-time)
+(query)
+The inclusive timestamp to search from (YYYY-MM-DD)
+timestampFrom
+timestampTo
+string($date-time)
+(query)
+The exclusive timestamp to search to (YYYY-MM-DD)
+timestampTo
+insertedBefore
+string($date-time)
+(query)
+If set, will only return transactions that have insert time before the supplied value
+insertedBefore
+periodFrom
+string($date-time)
+(query)
+The inclusive sub-date to search from (YYYY-MM-DD)
+periodFrom
+periodTo
+string($date-time)
+(query)
+The exclusive sub-date to search to (YYYY-MM-DD)
+periodTo
+originalPeriodFrom
+string($date-time)
+(query)
+The inclusive date to search from (YYYY-MM-DD)
+originalPeriodFrom
+originalPeriodTo
+string($date-time)
+(query)
+The exclusive date to search to (YYYY-MM-DD)
+originalPeriodTo
+amountFrom
+number($double)
+(query)
+The amount to search from
+amountFrom
+amountTo
+number($double)
+(query)
+The amount to search to
+amountTo
+searchText
+string
+(query)
+A free-form text to filter by that searches through transaction's text, original text, amount,
+currency, merchant name, category name, category synonyms, tags and comments
+searchText
+searchTextFields
+string
+(query)
+A comma-separated string of fields in which the searchText value will be searched.
+Allowed values: text, originalText, amount, currency, category, tags, comments, and keys from
+parsedData with the "parsedData.
+" prefix (e.g., to search in the budgetType field of parsedData,
+use "parsedData.budgetType"). If the parameter is null or empty, all fields will be searched: text,
+originalText, amount, currency, category, tags, comments.
+searchTextFields
+description
+string
+(query)
+The transaction description to filter by. If it's null, it will be ignored. But it is possible to search for
+empty descriptions.
+description
+currency
+string
+(query)
+The transaction currency to filter by. If it's null or empty, it will be ignored.
+currency
+comment
+string
+(query)
+The transaction comment to filter by. If it's null, it will be ignored. But it is possible to search for
+empty comments.
+comment
+tags
+string
+(query)
+A comma-separated string of tags to filter by
+tags
+orderBy
+string
+(query)
+The order of the returned transactions.
+Available values : ByDate, ByText, ByAmount, ByCategory, ByParsedData, ByOriginalDate
+--
+parsedDataNameToOrderBy
+string
+(query)
+The parsed data parameter to order by when OrderBy ==
+Meniga.Core.Api.Models.TransactionFilterOrderEnum.ByParsedData.
+parsedDataNameToOrderBy
+ascendingOrder
+boolean
+(query)
+Whether or not to order the returned transactions in an ascending order. The order is specified
+by Meniga.Core.Api.Models.TransactionFilterModel.OrderBy If nothing is specified, then the list
+will be ordered by date.
+--
+useAbsoluteAmountSearch
+boolean
+(query)
+Whether or not to use absolute amount search. If true, AmountFrom = 500 and AmountTo =
+1000 searches from -1000 to -500 as well as +500 to + 1000
+--
+useAndSearchForTags
+boolean
+(query)
+Whether or not tags are searched with AND or OR. If true, tags are searched with AND so the
+transactions returned will have to contain all the
+Meniga.Core.Api.Models.TransactionFilterModel.Tags.
+--
+useEqualsSearchForBankId
+boolean
+(query)
+Whether or not BankIds is searched with EQUALS or LIKE. If true, exact matches are found,
+otherwise matches that contain the search string for BankIds.
+--
+useAmountInCurrencySearch
+boolean
+(query)
+DEPRECATED: Use Meniga.Core.Api.Models.TransactionFilterModel.UseAmountFields instead
+Whether or not to search for amount in currency instead of amount
+--
+useExactDescription
+boolean
+(query)
+If true, filters by exact (equals) description as opposed to contains (which is the default)
+--
+useExactMerchantTexts
+boolean
+(query)
+If true, filters by exact (equals) merchant texts as opposed to contains (which is the default)
+--
+useAccentInsensitiveSearch
+boolean
+(query)
+Whether the search performed is accent insensitive or not
+--
+useKeywordsFromSearchText
+boolean
+(query)
+Whether resources are searched by Search Text split into keywords on " " with logical AND
+between keywords.
+--
+includeChildCategoriesForParentWhenUsingSearchText
+boolean
+(query)
+Whether the search should also return transactions with child categories when user searches
+for parent category
+--
+merchantIds
+string
+(query)
+A comma-separated string of merchant Ids to filter by
+merchantIds
+excludeMerchantIds
+string
+(query)
+A comma-separated string of merchant Ids to exclude
+excludeMerchantIds
+merchantTexts
+string
+(query)
+A comma-separated string of merchant texts to filter by
+merchantTexts
+isMerchant
+boolean
+(query)
+Flag that helps to filter transactions based on IsMerchant property
+--
+parsedData
+string
+(query)
+The transaction data to filter by. The data is filtered with union semantics (OR) example:
+[{"key":"reference"
+,
+"value":"ref123"},{"key":"reference"
+,
+"value":"ref124"}] will find transactions
+with "ref123" OR "ref124" transaction data.
+parsedData
+useAndSearchForParsedData
+boolean
+(query)
+If true, then all the fields passed as
+Meniga.Core.Api.Models.TransactionFilterModel.ParsedData will be AND-ed together. If the
+same key appears more than once then they will be OR-ed together and AND-ed with the other
+keys. If false, they will be OR-ed together. Example: Given ParsedData:
+(Key=X,Value=x1),(Key=X,Value=x2),(Key=Y,Value=y1) When true: (X=x1 OR X=x2) AND Y=y1
+When false: X=x1 OR X=x2 OR Y=y1
+--
+parsedDataExactKeys
+string
+(query)
+List of keys in parsed data that should only return a match if the value is exactly the same as
+supplied in ParsedData
+parsedDataExactKeys
+useParentMerchantIds
+boolean
+(query)
+If set to true, parent and the parents children will be found for each merchant id provided in
+Meniga.Core.Api.Models.TransactionFilterModel.MerchantIds and in
+Meniga.Core.Api.Models.TransactionFilterModel.ExcludeMerchantIds and they included in the
+filter. If the merchant has no parent then its children, if any, are added
+--
+excludeMerchantTexts
+string
+(query)
+A comma-separated string of merchant texts to exclude
+excludeMerchantTexts
+bankIds
+string
+(query)
+A comma-separated string of bank Ids to filter by
+bankIds
+ids
+string
+(query)
+A comma-separated string of transaction Ids to filter by
+ids
+useAmountFields
+string
+(query)
+This is a comma-separated string of transactionAmountField values that specifies which amount
+fields to use when searching using amountFrom and amountTo. If useAmountInCurrencySearch
+= true then only transactionAmountField.amountInCurrency is used. If
+useAmountInCurrencySearch = false then this list is used. If the list is empty then
+transactionAmountField.amount is used. Valid values are "amount" (0),
+"originalAmount" (1),
+"amountInCurrency" (2), and "bookedAmount" (3)
+useAmountFields
+externalMerchantIdentifiers
+string
+(query)
+A comma-separated string of external merchant identifiers on transactions
+externalMerchantIdentifiers
+merchantConnectorIds
+string
+(query)
+A comma-separated string of merchant connector ids.
+merchantConnectorIds
+merchantCategoryCodes
+string
+(query)
+A comma-separated string of merchant category codes ( MCC ).
+merchantCategoryCodes
+descriptions
+string
+(query)
+A comma-separated string of transaction descriptions to filter by. If it's null or empty, it will be
+ignored. Searching for empty descriptions is possible. If this property is set and is not empty,
+then the Meniga.Core.Api.Models.TransactionFilterModel.Description property will be ignored
+regardless of its value.
+descriptions
+useOriginalDescription
+boolean
+(query)
+If true, filters by the original description (transaction text from bank).
+--
+excludedParsedData
+string
+(query)
+The transaction data to filter by. The data is filtered with union semantics NOT(x1=y1 OR x2=y2)
+example: [{"key":"reference"
+,
+"value":"ref123"},{"key":"reference"
+,
+"value":"ref124"}] will find
+transactions with DO NOT HAVE EITHER "ref123" OR "ref124" in the "reference" field in
+transaction data.
+excludedParsedData
+excludeCounterpartyAccountIdentifiers
+string
+(query)
+A comma-separated string of counterparty account identifiers (who person is paying) to exclude
+excludeCounterpartyAccountIdentifiers
+text
+string
+(query)
+The text to search for
+text
+suggestionTypes
+string
+(query)
+A comma separate string of search suggestion types (Category, Merchant, Tag, Comment,
+Currency, Description, ParsedDataField) that should be included in the result. If null, no filtering
+is done.
+suggestionTypes
+maxResultsPerType
+integer($int32)
+(query)
+The max number of results per type to return. If null, it defaults to 10.
+maxResultsPerType
+onlyShowResultsWithTransactions
+boolean
+(query)
+If true, the results will only include categories, tags and merchants that have transactions.
+Descriptions, Currencies and comments can only be returned from existing transactions.
+Default value : false
+false
+take
+integer($int32)
+(query)
+This has been deprecated. Please use maxResultsPerType instead. The max number of results
+per type to return. If null,
+'maxResultsPerType' is used.
+take
+includeDisabledAccounts
+boolean
+(query)
+Whether or not to include transactions from disabled accounts in the result, defaults to 'false'
+Default value : false
+false
+includeHiddenAccounts
+boolean
+(query)
+Whether or not to include transactions from hidden accounts, default true
+--
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"id": 0,
+"text": "string"
+,
+"type": "string"
+,
+"value": "string"
+}
+]
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+DELETE
+/user/core/v1/transactions/{id}
+Delete a transaction
+GET
+/user/core/v1/transactions/{id}
+Get a transaction
+Parameters
+Name Description
+id *
+integer($int64)
+(path)
+The Id of the transaction
+id
+include
+string
+(query)
+Tells which related resources should be included in the response as 'included' data. Supported
+resources are "Account" and "Merchant"
+, e.g.
+"Account,Merchant" to get both resources
+included
+include
+includeCarbonFootprint
+boolean
+(query)
+Whether or not to include the CO2 footprint of the transaction
+Default value : false
+false
+includeChildMerchants
+boolean
+(query)
+Pass true if you want to have Merchant.ChildMerchants populated with child merchants if any
+Default value : false
+false
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": {
+"accountId": 0,
+"amount": 0,
+"amountInCurrency": 0,
+"balance": 0,
+"bankId": "string"
+,
+"bookedAmount": 0,
+"carbonFootprint": 0,
+"categoryChangedTime": "2026-03-18T15:17:40.037Z"
+,
+"categoryId": 0,
+"changedByRule": 0,
+"changedByRuleTime": "2026-03-18T15:17:40.037Z"
+,
+"comments": [
+{
+"comment": "string"
+,
+"createdDate": "2026-03-18T15:17:40.037Z"
+,
+"id": 0,
+"modifiedDate": "2026-03-18T15:17:40.037Z"
+,
+"personId": 0
+}
+],
+"counterpartyAccountIdentifier": "string"
+,
+"countryCode": "string"
+,
+"currency": "string"
+,
+"data": "string"
+,
+"dataFormat": 0,
+"date": "2026-03-18T15:17:40.037Z"
+,
+"detectedCategories": [
+{
+"categoryId": 0,
+"score": 0
+}
+],
+"dueDate": "2026-03-18T15:17:40.037Z"
+,
+"hasUncertainCategorization": true,
+"hasUserClearedCategoryUncertainty": true,
+"id": 0,
+"insertTime": "2026-03-18T15:17:40.037Z"
+,
+"isFlagged": true,
+"isMerchant": true,
+"isRead": true,
+"isSplitChild": true,
+"isUncleared": true,
+"lastModifiedTime": "2026-03-18T15:17:40.037Z"
+,
+"mcc": 0,
+"merchantId": 0,
+"metaData": [
+{
+"name": "string"
+,
+"value": "string"
+}
+],
+"originalAmount": 0,
+"originalDate": "2026-03-18T15:17:40.037Z"
+,
+"originalText": "string"
+,
+"parentIdentifier": "string"
+,
+"parsedData": [
+{
+"key": "string"
+,
+"value": "string"
+}
+],
+"splitRatio": 0,
+"tags": [
+"string"
+],
+"text": "string"
+,
+"timestamp": "2026-03-18T15:17:40.037Z"
+,
+"userData": "string"
+},
+"included": {
+"account": "string"
+,
+"merchant": "string"
+,
+"tags": [
+{
+"createdDate": "2026-03-18T15:17:40.037Z"
+,
+"id": 0,
+"lastUsedDate": "2026-03-18T15:17:40.037Z"
+"metadata": [
+{
+,
+"name": "string"
+,
+"value": "string"
+}
+],
+"modifiedDate": "2026-03-18T15:17:40.037Z"
+,
+"name": "string"
+,
+"transactionCount": 0
+}
+]
+}
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+PUT
+/user/core/v1/transactions/{id}
+Update a transaction
+POST
+/user/core/v1/transactions/{id}/comments
+Create a comment for a transaction. If the comment contains any tags (words starting with '#')
+they are automatically created and associated with this transaction if they do not already exist.
+DELETE
+/user/core/v1/transactions/{id}/comments/{commentId}
+Delete a comment for a transaction. If the comment contains any tags (words starting with '#')
+they are automatically disassociated with this transaction.
+PUT
+/user/core/v1/transactions/{id}/comments/{commentId}
+Update a comment for a transaction. If the comment contains any tags (words starting with '#')
+they are automatically created and associated with this transaction if they do not already exist.
+GET
+/user/core/v1/transactions/{id}/split
+Get a list of transactions that have been split from the same original transaction
+Parameters
+Name Description
+id *
+integer($int64)
+(path)
+The Id of the transaction
+id
+include
+string
+(query)
+Tells which related resources should be included in the response as 'included' data. Supported
+resources are "Account" and "Merchant"
+, e.g.
+"Account,Merchant" to get both resources
+included
+include
+includeCarbonFootprint
+boolean
+(query)
+Whether or not to include the CO2 footprint of the transaction
+Default value : false
+false
+includeChildMerchants
+boolean
+(query)
+Pass true if you want to have Merchant.ChildMerchants populated with child merchants if any
+Default value : false
+false
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"accountId": 0,
+"amount": 0,
+"amountInCurrency": 0,
+"balance": 0,
+"bankId": "string"
+,
+"bookedAmount": 0,
+"carbonFootprint": 0,
+"categoryChangedTime": "2026-03-18T15:17:40.043Z"
+,
+"categoryId": 0,
+"changedByRule": 0,
+"changedByRuleTime": "2026-03-18T15:17:40.043Z"
+,
+"comments": [
+{
+"comment": "string"
+,
+"createdDate": "2026-03-18T15:17:40.043Z"
+,
+"id": 0,
+"modifiedDate": "2026-03-18T15:17:40.043Z"
+,
+"personId": 0
+}
+],
+"counterpartyAccountIdentifier": "string"
+,
+"countryCode": "string"
+,
+"currency": "string"
+,
+"data": "string"
+,
+"dataFormat": 0,
+"date": "2026-03-18T15:17:40.043Z"
+,
+"detectedCategories": [
+{
+"categoryId": 0,
+"score": 0
+}
+],
+"dueDate": "2026-03-18T15:17:40.043Z"
+,
+"hasUncertainCategorization": true,
+"hasUserClearedCategoryUncertainty": true,
+"id": 0,
+"insertTime": "2026-03-18T15:17:40.043Z"
+,
+"isFlagged": true,
+"isMerchant": true,
+"isRead": true,
+"isSplitChild": true,
+"isUncleared": true,
+"lastModifiedTime": "2026-03-18T15:17:40.043Z"
+,
+"mcc": 0,
+"merchantId": 0,
+"metaData": [
+{
+"name": "string"
+,
+"value": "string"
+}
+],
+"originalAmount": 0,
+"originalDate": "2026-03-18T15:17:40.043Z"
+,
+"originalText": "string"
+,
+"parentIdentifier": "string"
+,
+"parsedData": [
+{
+"key": "string"
+,
+"value": "string"
+}
+],
+"splitRatio": 0,
+"tags": [
+"string"
+],
+"text": "string"
+,
+"timestamp": "2026-03-18T15:17:40.043Z"
+,
+"userData": "string"
+}
+],
+"included": {
+"account": "string"
+,
+"merchant": "string"
+"tags": [
+{
+,
+"createdDate": "2026-03-18T15:17:40.043Z"
+,
+"id": 0,
+"lastUsedDate": "2026-03-18T15:17:40.043Z"
+"metadata": [
+{
+,
+"name": "string"
+,
+"value": "string"
+}
+],
+"modifiedDate": "2026-03-18T15:17:40.043Z"
+,
+"name": "string"
+,
+"transactionCount": 0
+}
+]
+}
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+
+---
+
+Categories
+GET
+/user/core/v1/categories
+Get all categories, depending on the filter either the public ones or the both user and public
+categories
+Parameters
+Name Description
+isPublic
+boolean
+(query)
+This is true if the returned categories are public. False if the returned categories are both user
+and public
+Default value : true
+true
+culture
+string
+(query)
+WARNING: This has been deprecated. Please use Accept-Language HTTP header instead.
+The language the category names should be in (only relevant for public categories, user's
+custom categories are always in the language they are created)
+culture
+skip
+integer($int32)
+(query)
+The number of results skipped
+Default value : 0
+0
+take
+integer($int32)
+(query)
+The maximum number of results returned. If null, returns all.
+take
+subcategoryStructure
+string
+(query)
+The structure of subcategories in response, whether they are returned as a flat list (with
+reference to parent category), a tree (as part of parent category object) or both. By default they
+are returned as both
+Available values : Default, Tree, Flat
+Default value : Default
+Default
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"budgetGenerationType": 0,
+"categoryContextId": 0,
+"categoryRank": "string"
+,
+"categorySynonyms": [
+"string"
+],
+"categoryType": "string"
+,
+"children": [
+"string"
+],
+"displayData": "string"
+,
+"id": 0,
+"isFixedExpenses": true,
+"isPublic": true,
+"name": "string"
+,
+"orderId": 0,
+"otherCategoryName": "string"
+,
+"parentCategoryId": 0
+}
+],
+"meta": {
+"totalCount": 0
+}
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+POST
+/user/core/v1/categories
+Create a new category for a user
+POST
+/user/core/v1/categories/categoryamounts
+Get a list of the amount of transactions per category for a user during a particular time range.
+POST
+/user/core/v1/categories/categoryamountsbyperiod
+Get a list of the amount of transactions per category for a user within a specified time range
+groupped by time period.
+GET
+/user/core/v1/categories/ranks
+Get all available category ranks
+Parameters
+No parameters
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"id": 0,
+"name": "string"
+}
+]
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+GET
+/user/core/v1/categories/types
+Get all available category types
+Parameters
+No parameters
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"id": 0,
+"name": "string"
+}
+]
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+}
+]
+No links
+DELETE
+/user/core/v1/categories/{id}
+Delete a category and all its child categories
+GET
+/user/core/v1/categories/{id}
+Get a category
+Parameters
+Name Description
+id *
+integer($int32)
+(path)
+The id of the category
+id
+culture
+string
+(query)
+The culture of the category
+culture
+isPublic
+boolean
+(query)
+If set to true parent category will only include public/system categories as children. If
+false/default parent category will include user and public/system categories as children
+Default value : false
+false
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": {
+"budgetGenerationType": 0,
+"categoryContextId": 0,
+"categoryRank": "string"
+,
+"categorySynonyms": [
+"string"
+],
+"categoryType": "string"
+,
+"children": [
+"string"
+],
+"displayData": "string"
+,
+"id": 0,
+"isFixedExpenses": true,
+"isPublic": true,
+"name": "string"
+,
+"orderId": 0,
+"otherCategoryName": "string"
+,
+"parentCategoryId": 0
+}
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+
+----
+
+Accounts
+GET
+/user/core/v1/accounts
+Get a list of accounts associated with the user
+Parameters
+Name Description
+realmIdentifier
+string
+(query)
+The realm identifier
+realmIdentifier
+accountIdentifier
+string
+(query)
+The account identifier
+accountIdentifier
+accountCategory
+string
+(query)
+The Account Category as defined by the "GET /user/core/v1/accounts/accountcategories"
+endpoint. Allowed values are limited to what is defined in
+Meniga.Core.Api.Models.AccountCategoryEnum
+Available values : Unknown, Current, Credit, Savings, Loan, Wallet, Manual, Asset
+--
+accountCategoryDetails
+string
+(query)
+The Account Category detail as defined by the "GET /user/core/v1/accounts/accountcategories"
+endpoint. A comma-separated string that provides an optional extra level of filtering for
+Meniga.Core.Api.Models.AccountsFilter.AccountCategory.
+accountCategoryDetails
+includeHidden
+boolean
+(query)
+True if hidden accounts should also be returned. False or omitted will only return accounts that
+are not hidden.
+--
+includeDisabled
+boolean
+(query)
+True if disabled accounts should also be returned. False or omitted will only return accounts that
+are not disabled.
+--
+realmUserIds
+string
+(query)
+A comma-separated string that allows filtering by realm user ids
+realmUserIds
+skip
+integer($int32)
+(query)
+The number of accounts bypassed
+Default value : 0
+0
+take
+integer($int32)
+(query)
+The maximum number of accounts returned. If null, returns all.
+take
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"accountAuthorizationType": "string"
+,
+"accountCategory": "string"
+,
+"accountCategoryDetails": "string"
+,
+"accountClass": "string"
+,
+"accountIdentifier": "string"
+,
+"accountRoleExternal": "string"
+,
+"accountStatusExternal": "string"
+,
+"accountTypeId": 0,
+"attachedToUserDate": "2026-03-18T15:13:47.251Z"
+"balance": 0,
+"balanceInUserCurrency": 0,
+"balances": [
+{
+"amount": 0,
+"currency": "string"
+,
+"date": "2026-03-18T15:13:47.251Z"
+,
+"type": "string"
+,
+}
+],
+"createDate": "2026-03-18T15:13:47.251Z"
+,
+"currencyCode": "string"
+,
+"emergencyFundBalanceLimit": 0,
+"id": 0,
+"inactive": true,
+"isDisabled": true,
+"isHidden": true,
+"isImportAccount": true,
+"lastUpdate": "2026-03-18T15:13:47.251Z"
+,
+"limit": 0,
+"limitInUserCurrency": 0,
+"metadata": [
+{
+"name": "string"
+,
+"value": "string"
+}
+],
+"name": "string"
+,
+"orderId": 0,
+"organizationIdentifier": "string"
+,
+"organizationName": "string"
+,
+"personId": 0,
+"productName": "string"
+,
+"realmCredentialsId": 0,
+"realmIdentifier": "string"
+}
+],
+"meta": {
+"totalCount": 0
+}
+}
+No links
+400
+Bad Request
+Media type
+application/json
+{
+"detail": "string"
+,
+"instance": "string"
+,
+"status": 0,
+"title": "string"
+,
+"type": "string"
+,
+"additionalProp1": "string"
+,
+"additionalProp2": "string"
+,
+"additionalProp3": "string"
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+}
+]
+No links
+POST
+/user/core/v1/accounts
+Create a new account for the given user for a certain realm account type
+GET
+/user/core/v1/accounts/accountcategories
+Get a list of all available account type categories
+Parameters
+No parameters
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"id": 0,
+"name": "string"
+,
+"parentId": 0,
+"parentName": "string"
+}
+]
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+GET
+/user/core/v1/accounts/accounttypes
+Get a list of all general account types within the system
+Parameters
+Name Description
+organizationId
+integer($int32)
+(query)
+The Id of an organization to get the account types for. If empty then return all account types.
+organizationId
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"accountCategory": "string"
+,
+"accountCategoryDetails": "string"
+,
+"accountClass": "string"
+,
+"accountTypeCategory": "string"
+,
+"accountTypeProfileId": 0,
+"connectorPattern": "string"
+,
+"description": "string"
+,
+"disableConnector": true,
+"duplicateResolver": "string"
+,
+"enableCashback": true,
+"enableConnectorDuringBatchSynchronization": true,
+"id": 0,
+"importAccountConfiguration": "string"
+,
+"name": "string"
+,
+"organizationId": 0,
+"pastSyncDays": 0,
+"realmId": 0
+}
+}
+]
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+GET
+/user/core/v1/accounts/accounttypes/{id}
+Get an account type
+Parameters
+Name Description
+id *
+integer($int32)
+(path)
+The Id of the account type
+id
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": {
+"accountCategory": "string"
+,
+"accountCategoryDetails": "string"
+,
+"accountClass": "string"
+,
+"accountTypeCategory": "string"
+,
+"accountTypeProfileId": 0,
+"connectorPattern": "string"
+,
+"description": "string"
+,
+"disableConnector": true,
+"duplicateResolver": "string"
+,
+"enableCashback": true,
+"enableConnectorDuringBatchSynchronization": true,
+"id": 0,
+"importAccountConfiguration": "string"
+,
+"name": "string"
+,
+"organizationId": 0,
+"pastSyncDays": 0,
+"realmId": 0
+}
+}
+No links
+404
+Not Found
+Media type
+application/json
+{
+"detail": "string"
+,
+"instance": "string"
+,
+"status": 0,
+"title": "string"
+,
+"type": "string"
+,
+"additionalProp1": "string"
+,
+"additionalProp2": "string"
+,
+"additionalProp3": "string"
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+}
+]
+No links
+GET
+/user/core/v1/accounts/authorizationtypes
+Get a list of all available account authorization types
+Parameters
+No parameters
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"id": 0,
+"name": "string"
+}
+]
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+DELETE
+/user/core/v1/accounts/{id}
+Hard delete of an account and all connected transactions, enrichment data and user events
+belonging to it
+GET
+/user/core/v1/accounts/{id}
+Get an account associated with the user
+Parameters
+Name Description
+id *
+integer($int64)
+(path)
+the Id of the account
+id
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": {
+"accountAuthorizationType": "string"
+,
+"accountCategory": "string"
+,
+"accountCategoryDetails": "string"
+,
+"accountClass": "string"
+,
+"accountIdentifier": "string"
+,
+"accountRoleExternal": "string"
+,
+"accountStatusExternal": "string"
+,
+"accountTypeId": 0,
+"attachedToUserDate": "2026-03-18T15:13:47.266Z"
+,
+"balance": 0,
+"balanceInUserCurrency": 0,
+"balances": [
+{
+"amount": 0,
+"currency": "string"
+,
+"date": "2026-03-18T15:13:47.266Z"
+,
+"type": "string"
+}
+],
+"createDate": "2026-03-18T15:13:47.266Z"
+,
+"currencyCode": "string"
+,
+"emergencyFundBalanceLimit": 0,
+"id": 0,
+"inactive": true,
+"isDisabled": true,
+"isHidden": true,
+"isImportAccount": true,
+"lastUpdate": "2026-03-18T15:13:47.266Z"
+,
+"limit": 0,
+"limitInUserCurrency": 0,
+"metadata": [
+{
+"name": "string"
+,
+"value": "string"
+}
+],
+"name": "string"
+,
+"orderId": 0,
+"organizationIdentifier": "string"
+,
+"organizationName": "string"
+,
+"personId": 0,
+"productName": "string"
+,
+"realmCredentialsId": 0,
+"realmIdentifier": "string"
+}
+}
+No links
+404
+Not Found
+Media type
+application/json
+{
+"detail": "string"
+,
+"instance": "string"
+,
+"status": 0,
+"title": "string"
+,
+"type": "string"
+,
+"additionalProp1": "string"
+,
+"additionalProp2": "string"
+,
+"additionalProp3": "string"
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+PUT
+/user/core/v1/accounts/{id}
+Update an account
+GET
+/user/core/v1/accounts/{id}/history
+Get a list of account balance history entries
+Parameters
+Name Description
+id *
+integer($int64)
+(path)
+The id of the account
+id
+dateFrom *
+string($date-time)
+(query)
+The inclusive start date (YYYY-MM-DD) for the entries to be fetched
+dateFrom
+dateTo *
+string($date-time)
+(query)
+The inclusive end date (YYYY-MM-DD) for the entries to be fetched
+dateTo
+sort
+string
+(query)
+Allows sorting by BalanceDate and Balance. Prefixing the value of the property by "
+-
+" indicates
+ordering by DESC else ASC. The default is BalanceDate.
+Default value : BalanceDate
+BalanceDate
+intervalGrouping
+string
+(query)
+An interval enum indicating what balance history entries should be returned. Possible values are
+"Daily"
+,
+"Weekly"
+,
+"Monthly" and "Yearly"
+. E.g. if "Daily" is chosen the last entry for each day for
+each account will be returned.
+Available values : None, Daily, Weekly, Monthly, Yearly
+Default value : None
+None
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"accountId": 0,
+"balance": 0,
+"balanceDate": "2026-03-18T15:13:47.271Z"
+,
+"balanceInUserCurrency": 0,
+"id": 0,
+"isDefault": true
+}
+],
+"meta": {
+"startBalance": 0,
+"startBalanceDate": "2026-03-18T15:13:47.271Z"
+,
+"startBalanceInUserCurrency": 0
+}
+}
+No links
+404
+Not Found
+Media type
+application/json
+{
+"detail": "string"
+,
+"instance": "string"
+,
+"status": 0,
+"title": "string"
+,
+"type": "string"
+,
+"additionalProp1": "string"
+,
+"additionalProp2": "string"
+,
+"additionalProp3": "string"
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+GET
+/user/core/v1/accounts/{id}/metadata
+Get all parameters of an account
+Parameters
+Name Description
+id *
+integer($int64)
+(path)
+The Id of the account
+id
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"name": "string"
+,
+"value": "string"
+}
+]
+}
+No links
+404
+Not Found
+Media type
+application/json
+{
+"detail": "string"
+,
+"instance": "string"
+,
+"status": 0,
+"title": "string"
+,
+"type": "string"
+,
+"additionalProp1": "string"
+,
+"additionalProp2": "string"
+,
+"additionalProp3": "string"
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+PUT
+/user/core/v1/accounts/{id}/metadata
+Create or update account parameter
+GET
+/user/core/v1/accounts/{id}/metadata/{name}
+Get an account parameter
+Parameters
+Name Description
+id *
+integer($int64)
+(path)
+The Id of the account
+id
+name *
+string
+(path)
+The name of the account parameter
+name
+Responses
+Code Description Links
+200
+OK
+Media type
+application/json
+Controls Accept header.
+{
+"data": {
+"value": "string"
+}
+}
+No links
+404
+Not Found
+Media type
+application/json
+{
+"detail": "string"
+,
+"instance": "string"
+,
+"status": 0,
+"title": "string"
+,
+"type": "string"
+,
+"additionalProp1": "string"
+,
+"additionalProp2": "string"
+,
+"additionalProp3": "string"
+}
+No links
+409
+The request could not be completed due to a conflict with the current state of the resource.
+Refresh data and try again.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+No links
+500
+The server encountered an unexpected condition which prevented it from fulfilling the request.
+Media type
+application/json
+{
+"errors": [
+{
+"code": "string"
+,
+"exceptionMessage": "string"
+,
+"exceptionType": "string"
+,
+"message": "string"
+,
+"messageDetails": "string"
+,
+"stackTrace": "string"
+}
+]
+}
+
+
+---
+
+Cashflow Assistant API
+2
+OAS 3.0
+https://api.meniga.cloud/spec/user/cashflow
+_
+Documentation
+front-v2
+Terms of service
+Meniga - Website
+UpcomingCrud
+GET
+/user/cashflow/v2/upcoming
+Get a list of upcoming transactions
+Parameters
+Name Description
+dateFrom *
+string($date-time)
+(query)
+The inclusive start date of the entries to be fetched
+2026-03-18T13:04:40.7746937
+dateTo *
+string($date-time)
+(query)
+The inclusive end date of the entries to be fetched
+2026-03-18T13:04:40.7748125
+accountIds
+string
+(query)
+A comma separate string of account Ids to filter by. If empty, includes all accounts.
+accountIds
+includeDetails
+boolean
+(query)
+A flag indicating if details should be fetched and assigned to the Details property in the
+response or not
+--
+watchedOnly
+boolean
+(query)
+A flag indicating if only watched upcoming transactions should be fetched or not
+--
+recurringPatternId
+integer($int64)
+(query)
+Include only the upcoming transactions with this recurring pattern Id
+recurringPatternId
+paymentStatus
+string
+(query)
+Optional filter for PaymentStatus, can be one, or a combination of the following values: "Open"
+,
+"Paid" or "OnHold" separated by a comma.
+paymentStatus
+statuses
+string
+(query)
+A comma separate string of recurring statuses (Unknown, Suggested, Accepted, Rejected). If
+empty, includes all.
+statuses
+tags
+string
+(query)
+A comma separated list of tags to filter upcomings by. If empty, includes all. Returns upcomings
+associated with any of the specified tags. Filter is case insensitive.
+tags
+categoryIds
+string
+(query)
+A comma separate string of category Ids to filter by
+categoryIds
+categoryTypes
+string
+(query)
+A comma separate string of category types (Expenses, Income, Savings, Excluded) to filter by.
+If empty, includes all.
+categoryTypes
+sources
+string
+(query)
+A comma separate string of upcoming source types to filter (Detected, ScheduledPayment,
+Invoice, Manual). If empty, includes all.
+sources
+currency
+string
+(query)
+The upcoming transaction currency to filter by. If it's null or empty, includes all.
+currency
+sort
+string
+(query)
+Decides the order of the returned upcoming transactions, defined by a comma separated list of
+the properties of the Upcoming object. The sort order for each sort field is ascending unless it is
+prefixed with a "
+-
+" in which case it is descending. If this string is null or empty then default
+sorting is applied (Date ascending, Id ascending) The supported Upcoming fields are:
+AccountId, AmountInCurrency, CategoryId, CurrencyCode, Date, Id, IsFlagged, MerchantId,
+Text, PaymentStatus The string "AccountId,Text,
+-AmountInCurrency" results in the upcoming
+transactions being sorted by AccountId ascending, Text ascending and AmountInCurrency
+descending.
+sort
+includeDisabledAccounts
+boolean
+(query)
+Whether or not to include upcoming transactions from disabled accounts in the result
+--
+searchText
+string
+(query)
+comments
+Free-form text to filter by that searches through upcoming transaction text, currency, tags and
+searchText
+amountFrom
+number($double)
+(query)
+The amount to search from. This filter works best along with CurrencyCode filter.
+Upcoming transactions are stored only with the amount in currency field. If query is not limited to
+a single currency code cashflow will attempt to calculate amount threshold into each currency
+user has transactions in.
+amountFrom
+amountTo
+number($double)
+(query)
+The amount to search to
+Upcoming transactions are stored only with the amount in currency field. If query is not limited to
+a single currency code cashflow will attempt to calculate amount threshold into each currency
+user has transactions in.
+amountTo
+merchantIds
+string
+(query)
+A comma separate string of merchant Ids to filter by. Use value -1 to query upcomings with
+empty merchant id.
+merchantIds
+ids
+string
+(query)
+A comma separate string of upcoming transaction Ids to filter by.
+ids
+comment
+string
+(query)
+Comment related to upcoming
+comment
+useExactDescription
+boolean
+(query)
+If true, filters by exact (equals) description as opposed to contains (which is the default).
+--
+description
+string
+(query)
+The upcoming transaction description to filter by. If it's null or empty, it will be ignored.
+description
+skip
+integer($int32)
+(query)
+The number of upcomings bypassed
+Default value : 0
+0
+take
+integer($int32)
+(query)
+The maximum number of upcomings returned. Null returns 1000 by default.
+Default value : 1000
+1000
+Responses
+Code Description Links
+200
+Success
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"accountId": 0,
+"amount": 0,
+"amountInCurrency": 0,
+"bankReference": "string"
+,
+"categoryId": 0,
+"comments": [
+{
+"comment": "string"
+,
+"id": 0
+}
+],
+"currencyCode": "string"
+,
+"date": "2026-03-18T13:04:40.7684411"
+,
+"details": {
+"invoice": {
+"amountInCurrency": 0,
+"bankReference": "string"
+,
+"bookingDate": "2026-03-18T13:04:40.7711488"
+,
+"counterpartyAccIdentifier": "string"
+,
+"counterpartyIdentifier": "string"
+,
+"counterpartyName": "string"
+,
+"counterpartyReferenceText": "string"
+,
+"currencyCode": "string"
+,
+"dueDate": "2026-03-18T13:04:40.7709955"
+,
+"feeAmount": 0,
+"finalDueDate": "2026-03-18T13:04:40.7710702"
+"id": 0,
+"identifier": "string"
+,
+"invoiceText": "string"
+,
+"isReceivable": true,
+"issuedDate": "2026-03-18T13:04:40.770917"
+,
+"issuerAccIdentifier": "string"
+,
+"issuerIdentifier": "string"
+,
+"issuerName": "string"
+,
+"issuerReferenceText": "string"
+,
+"paymentStatus": "Open"
+,
+"vatAmount": 0
+,
+},
+"scheduledPayment": {
+"amountInCurrency": 0,
+"bankReference": "string"
+,
+"bookingDate": "2026-03-18T13:04:40.7727963"
+,
+"currencyCode": "string"
+,
+"destinationAccIdentifier": "string"
+,
+"dueDate": "2026-03-18T13:04:40.7727162"
+,
+"id": 0,
+"identifier": "string"
+,
+"isReceivable": true,
+"issuedDate": "2026-03-18T13:04:40.7726334"
+,
+"paymentStatus": "Open"
+,
+"paymentText": "string"
+,
+"referenceText": "string"
+,
+"sourceAccIdentifier": "string"
+}
+},
+"detectedCategories": [
+{
+"categoryId": 0,
+"score": 0
+}
+],
+"hasUncertainCategorization": true,
+"id": 0,
+"invoiceId": 0,
+"isFlagged": true,
+"isUserCategory": true,
+"isUserText": true,
+"isWatched": true,
+"merchantId": 0,
+"paymentStatus": "Open"
+,
+"reconcileScores": [
+{
+"confidenceScore": 0,
+"isValidAccordingToUser": true,
+"isValidAccordingToUserComment": "string"
+,
+"transactionId": 0,
+"upcomingId": 0
+}
+],
+"recurringPattern": {
+"accountId": 0,
+"amountInCurrency": 0,
+"categoryId": 0,
+"comments": [
+{
+"comment": "string"
+,
+"id": 0
+}
+],
+"currencyCode": "string"
+,
+"customData": "string"
+,
+"detectedCategories": [
+{
+"categoryId": 0,
+"score": 0
+}
+],
+"id": 0,
+"isFlagged": true,
+"hasUncertainCategorization": true,
+"isSubscription": true,
+"isUserCategory": true,
+"isWatched": true,
+"pattern": {
+"cronExpression": "string"
+,
+"dayOfMonth": "string"
+,
+"dayOfMonthInterval": 0,
+"dayOfWeek": "string"
+,
+"dayOfWeekInterval": 0,
+"daysOfMonth": [
+{
+"interval": 0,
+"value": "string"
+}
+],
+"daysOfWeek": [
+{
+"interval": 0,
+"value": "string"
+}
+],
+"month": "string"
+,
+"monthInterval": 0,
+"months": [
+{
+"interval": 0,
+"value": "January"
+}
+],
+"weekInterval": 0,
+"weekOfYear": 0,
+"weeksOfYear": [
+{
+"interval": 0,
+"value": 0
+}
+]
+},
+"repeatUntil": "2026-03-18T13:04:40.759163"
+,
+"scheduledPaymentId": 0,
+"status": "Unknown"
+,
+"tags": [
+{
+"id": 0,
+"name": "string"
+}
+],
+"text": "string"
+,
+"transactionIds": [
+0
+],
+"type": "Unknown"
+},
+"scheduledPaymentId": 0,
+"source": "Detected"
+,
+"tags": [
+{
+"id": 0,
+"name": "string"
+}
+],
+"text": "string"
+,
+"transactionId": 0
+}
+],
+"meta": {
+"totalCount": 0
+}
+}
+No links
+POST
+/user/cashflow/v2/upcoming
+Create an upcoming transaction
+DELETE
+/user/cashflow/v2/upcoming/{id}
+Delete an upcoming
+GET
+/user/cashflow/v2/upcoming/{id}
+Get an upcoming transaction
+Parameters
+Name Description
+id *
+integer($int64)
+(path)
+The Id of the upcoming transaction
+id
+Responses
+Code Description Links
+200
+Success
+Media type
+application/json
+Controls Accept header.
+{
+"data": {
+"accountId": 0,
+"amount": 0,
+"amountInCurrency": 0,
+"bankReference": "string"
+,
+"categoryId": 0,
+"comments": [
+{
+"comment": "string"
+,
+"id": 0
+}
+],
+"currencyCode": "string"
+,
+"date": "2026-03-18T13:04:40.7684411"
+,
+"details": {
+"invoice": {
+"amountInCurrency": 0,
+"bankReference": "string"
+,
+"bookingDate": "2026-03-18T13:04:40.7711488"
+,
+"counterpartyAccIdentifier": "string"
+,
+"counterpartyIdentifier": "string"
+,
+"counterpartyName": "string"
+,
+"counterpartyReferenceText": "string"
+,
+"currencyCode": "string"
+,
+"dueDate": "2026-03-18T13:04:40.7709955"
+,
+"feeAmount": 0,
+"finalDueDate": "2026-03-18T13:04:40.7710702"
+"id": 0,
+"identifier": "string"
+,
+"invoiceText": "string"
+,
+"isReceivable": true,
+"issuedDate": "2026-03-18T13:04:40.770917"
+,
+,
+"issuerAccIdentifier": "string"
+,
+"issuerIdentifier": "string"
+,
+"issuerName": "string"
+,
+"issuerReferenceText": "string"
+,
+"paymentStatus": "Open"
+,
+"vatAmount": 0
+},
+"scheduledPayment": {
+"amountInCurrency": 0,
+"bankReference": "string"
+,
+"bookingDate": "2026-03-18T13:04:40.7727963"
+,
+"currencyCode": "string"
+,
+"destinationAccIdentifier": "string"
+,
+"dueDate": "2026-03-18T13:04:40.7727162"
+,
+"id": 0,
+"identifier": "string"
+,
+"isReceivable": true,
+"issuedDate": "2026-03-18T13:04:40.7726334"
+,
+"paymentStatus": "Open"
+,
+"paymentText": "string"
+,
+"referenceText": "string"
+,
+"sourceAccIdentifier": "string"
+}
+},
+"detectedCategories": [
+{
+"categoryId": 0,
+"score": 0
+}
+],
+"hasUncertainCategorization": true,
+"id": 0,
+"invoiceId": 0,
+"isFlagged": true,
+"isUserCategory": true,
+"isUserText": true,
+"isWatched": true,
+"merchantId": 0,
+"paymentStatus": "Open"
+,
+"reconcileScores": [
+{
+"confidenceScore": 0,
+"isValidAccordingToUser": true,
+"isValidAccordingToUserComment": "string"
+,
+"transactionId": 0,
+"upcomingId": 0
+}
+],
+"recurringPattern": {
+"accountId": 0,
+"amountInCurrency": 0,
+"categoryId": 0,
+"comments": [
+{
+"comment": "string"
+,
+"id": 0
+}
+],
+"currencyCode": "string"
+,
+"customData": "string"
+,
+"detectedCategories": [
+{
+"categoryId": 0,
+"score": 0
+}
+],
+"hasUncertainCategorization": true,
+"id": 0,
+"isFlagged": true,
+"isSubscription": true,
+"isUserCategory": true,
+"isWatched": true,
+"pattern": {
+"cronExpression": "string"
+,
+"dayOfMonth": "string"
+,
+"dayOfMonthInterval": 0,
+"dayOfWeek": "string"
+,
+"dayOfWeekInterval": 0,
+"daysOfMonth": [
+{
+"interval": 0,
+"value": "string"
+}
+],
+"daysOfWeek": [
+{
+"interval": 0,
+"value": "string"
+}
+],
+"month": "string"
+,
+"monthInterval": 0,
+"months": [
+{
+"interval": 0,
+"value": "January"
+}
+],
+"weekInterval": 0,
+"weekOfYear": 0,
+"weeksOfYear": [
+{
+"interval": 0,
+"value": 0
+}
+]
+},
+"repeatUntil": "2026-03-18T13:04:40.759163"
+,
+"scheduledPaymentId": 0,
+"status": "Unknown"
+,
+"tags": [
+{
+"id": 0,
+"name": "string"
+}
+],
+"text": "string"
+,
+"transactionIds": [
+0
+],
+"type": "Unknown"
+},
+"scheduledPaymentId": 0,
+"source": "Detected"
+,
+"tags": [
+{
+"id": 0,
+"name": "string"
+}
+],
+"text": "string"
+,
+"transactionId": 0
+}
+}
+No links
+404
+Not Found
+Media type
+application/json
+{
+"detail": "string"
+,
+"instance": "string"
+,
+"status": 0,
+"title": "string"
+,
+"type": "string"
+,
+"additionalProp1": "string"
+,
+"additionalProp2": "string"
+,
+"additionalProp3": "string"
+}
+No links
+PUT
+/user/cashflow/v2/upcoming/{id}
+Update an upcoming transaction
+AccountSet
+DELETE
+/user/cashflow/v2/upcoming/accounts/default
+Delete the default upcoming account connection so upcomings without account information
+suggestion will not be associated with any account
+GET
+/user/cashflow/v2/upcoming/accounts/default
+Get the default upcoming account id that will be associated with upcomings that do not have
+account information suggestion
+Parameters
+No parameters
+Responses
+Code Description Links
+200
+Success
+Media type
+application/json
+Controls Accept header.
+{
+"data": {
+"accountId": 0
+}
+}
+No links
+404
+Not Found
+Media type
+application/json
+{
+"detail": "string"
+,
+"instance": "string"
+,
+"status": 0,
+"title": "string"
+,
+"type": "string"
+,
+"additionalProp1": "string"
+,
+"additionalProp2": "string"
+,
+"additionalProp3": "string"
+}
+No links
+POST
+/user/cashflow/v2/upcoming/accounts/default/{accountId}
+Create or update the default upcoming account that will be associated with upcomings that do
+not have account information suggestion
+GET
+/user/cashflow/v2/upcoming/accounts/included
+Get accounts that are included by default in balance projection used when calling the "GET
+/user/balances"
+Parameters
+No parameters
+Responses
+Code Description Links
+200
+Success
+Media type
+application/json
+Controls Accept header.
+{
+"data": {
+"accountIds": [
+0
+]
+}
+}
+No links
+404
+Not Found
+Media type
+application/json
+{
+"detail": "string"
+,
+"instance": "string"
+,
+"status": 0,
+"title": "string"
+,
+"type": "string"
+,
+"additionalProp1": "string"
+,
+"additionalProp2": "string"
+,
+"additionalProp3": "string"
+}
+No links
+POST
+/user/cashflow/v2/upcoming/accounts/included
+Create (or overwrite) the accounts to be included in the predicted accounts' balances used
+when calling the "GET /user/v1/upcoming/balances"
+GET
+/user/cashflow/v2/upcoming/balances
+Get predicted balance since today until selected date
+Parameters
+Name Description
+dateTo *
+string($date-time)
+(query)
+The inclusive end date of the entries to be fetched
+2026-03-18T13:04:40.7476739
+includeOverdueFromDate
+string($date-time)
+(query)
+When set the open upcoming transactions from this date (inclusive) are projected to today's
+balance
+2026-03-18T13:04:40.747812
+accountIds
+string
+(query)
+A comma separate string of account Ids to filter by. If empty, the included accounts listed in the
+"GET /user/v1/upcoming/accounts/included" endpoint will be used.
+accountIds
+includeUnlinked
+boolean
+(query)
+Indicate if upcomings that are not linked to any account should be included
+--
+useAvailableAmount
+boolean
+(query)
+Indicate if the amount of accounts should be the available amount or the real amount (not taking
+the limit/overdraft into consideration)
+--
+includeDisabledAccounts
+boolean
+(query)
+Whether or not to include upcoming transactions from disabled accounts in the result
+--
+Responses
+Code Description Links
+200
+Success
+Media type
+application/json
+Controls Accept header.
+{
+"data": {
+"balanceDates": [
+{
+"date": "2026-03-18T13:04:40.7488622"
+,
+"endOfDayBalance": 0,
+"expenses": 0,
+"income": 0
+}
+],
+"currency": "string"
+,
+"endBalance": 0,
+"startBalance": 0
+}
+}
+No links
+400
+Bad Request
+Media type
+application/json
+{
+"errors": [
+{
+"message": "string"
+,
+"messageDetails": "string"
+}
+]
+}
+No links
+GET
+/user/cashflow/v2/upcoming/thresholdsets
+Get threshold sets used in user events related to balance projection
+Parameters
+Name Description
+accountIds
+string
+(query)
+A comma separate string of account ids to filter by. If empty, returns all.
+accountIds
+Responses
+Code Description Links
+200
+Success
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"accountIds": [
+0
+],
+"currencyCode": "string"
+,
+"id": 0,
+"lowerThresholds": [
+0
+],
+0
+"upperThresholds": [
+]
+}
+]
+}
+No links
+POST
+/user/cashflow/v2/upcoming/thresholdsets
+Create a threshold set used in user events related to balance projection
+DELETE
+/user/cashflow/v2/upcoming/thresholdsets/{id}
+Delete a threshold set used in user events related to balance projection
+PUT
+/user/cashflow/v2/upcoming/thresholdsets/{id}
+Update a threshold set used in user events related to balance projection
+UpcomingComment
+Reconciliation
+UpcomingRecurringPattern
+GET
+/user/cashflow/v2/upcoming/recurring
+Get a list of recurring patterns
+Parameters
+Name Description
+statuses
+string
+(query)
+A comma separate string of recurring statuses (Unknown, Suggested, Accepted, Rejected). If
+empty, includes all.
+statuses
+types
+string
+(query)
+A comma separate string of recurring types (Unknown, Detected, Manual). If empty, includes all.
+types
+tags
+string
+(query)
+A comma separated list of tags to filter recurring patterns by. If empty, includes all. Returns
+upcomings associated with any of the specified tags. Filter is case insensitive.
+tags
+categoryIds
+string
+(query)
+A comma separate string of category Ids to filter by
+categoryIds
+categoryTypes
+string
+(query)
+A comma separate string of category types (Expenses, Income, Savings, Excluded) to filter by.
+If empty, includes all.
+categoryTypes
+includeDisabledAccounts
+boolean
+(query)
+Whether or not to include upcoming transactions from disabled accounts in the result
+--
+skip
+integer($int32)
+(query)
+The number of recurrings bypassed
+Default value : 0
+0
+take
+integer($int32)
+(query)
+The maximum number of recurring patterns returned. Null returns 1000 by default.
+Default value : 1000
+1000
+Responses
+Code Description Links
+200
+Success
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"accountId": 0,
+"amountInCurrency": 0,
+"categoryId": 0,
+"comments": [
+{
+"comment": "string"
+,
+"id": 0
+}
+],
+"currencyCode": "string"
+"customData": "string"
+,
+"detectedCategories": [
+{
+,
+"categoryId": 0,
+"score": 0
+}
+],
+"hasUncertainCategorization": true,
+"id": 0,
+"isFlagged": true,
+"isSubscription": true,
+"isUserCategory": true,
+"isWatched": true,
+"pattern": {
+"cronExpression": "string"
+,
+"dayOfMonth": "string"
+,
+"dayOfMonthInterval": 0,
+"dayOfWeek": "string"
+,
+"dayOfWeekInterval": 0,
+"daysOfMonth": [
+{
+"interval": 0,
+"value": "string"
+}
+],
+"daysOfWeek": [
+{
+"interval": 0,
+"value": "string"
+}
+],
+"month": "string"
+,
+"monthInterval": 0,
+"months": [
+{
+"interval": 0,
+"value": "January"
+}
+],
+"weekInterval": 0,
+"weekOfYear": 0,
+"weeksOfYear": [
+{
+"interval": 0,
+"value": 0
+}
+]
+},
+"repeatUntil": "2026-03-18T13:04:40.759163"
+,
+"scheduledPaymentId": 0,
+"status": "Unknown"
+,
+"tags": [
+{
+"id": 0,
+"name": "string"
+}
+],
+"text": "string"
+,
+"transactionIds": [
+0
+],
+"type": "Unknown"
+}
+],
+"meta": {
+"totalCount": 0
+}
+}
+No links
+POST
+/user/cashflow/v2/upcoming/recurring/disable
+Disables automatic pattern detection for current user.
+POST
+/user/cashflow/v2/upcoming/recurring/enable
+Enables automatic pattern detection for current user.
+DELETE
+/user/cashflow/v2/upcoming/recurring/{id}
+Result of the action depends on the type of recurring pattern. Manual pattern is hard deleted.
+Detected pattern is marked as rejected so that it isn't detected again.
+GET
+/user/cashflow/v2/upcoming/recurring/{id}
+Get a recurring pattern
+Parameters
+Name Description
+id *
+integer($int64)
+(path)
+The Id of the recurring pattern
+id
+Responses
+Code Description Links
+200
+Success
+Media type
+application/json
+Controls Accept header.
+{
+"data": {
+"accountId": 0,
+"amountInCurrency": 0,
+"categoryId": 0,
+"comments": [
+{
+"comment": "string"
+,
+"id": 0
+}
+],
+"currencyCode": "string"
+,
+"customData": "string"
+,
+"detectedCategories": [
+{
+"categoryId": 0,
+"score": 0
+}
+],
+"hasUncertainCategorization": true,
+"id": 0,
+"isFlagged": true,
+"isSubscription": true,
+"isUserCategory": true,
+"isWatched": true,
+"pattern": {
+"cronExpression": "string"
+,
+"dayOfMonth": "string"
+,
+"dayOfMonthInterval": 0,
+"dayOfWeek": "string"
+,
+"dayOfWeekInterval": 0,
+"daysOfMonth": [
+{
+"interval": 0,
+"value": "string"
+}
+],
+"daysOfWeek": [
+{
+"interval": 0,
+"value": "string"
+}
+],
+"month": "string"
+,
+"monthInterval": 0,
+"months": [
+{
+"interval": 0,
+"value": "January"
+}
+],
+"weekInterval": 0,
+"weekOfYear": 0,
+"weeksOfYear": [
+{
+"interval": 0,
+"value": 0
+}
+]
+},
+"repeatUntil": "2026-03-18T13:04:40.759163"
+"scheduledPaymentId": 0,
+"status": "Unknown"
+,
+,
+"tags": [
+{
+"id": 0,
+"name": "string"
+}
+],
+"text": "string"
+,
+"transactionIds": [
+0
+],
+"type": "Unknown"
+}
+}
+No links
+404
+Not Found
+Media type
+application/json
+{
+"detail": "string"
+,
+"instance": "string"
+,
+"status": 0,
+"title": "string"
+,
+"type": "string"
+,
+"additionalProp1": "string"
+,
+"additionalProp2": "string"
+,
+"additionalProp3": "string"
+}
+No links
+PUT
+/user/cashflow/v2/upcoming/recurring/{id}/accept
+Accepts pattern of the type "Manual" or "Detected"
+PUT
+/user/cashflow/v2/upcoming/recurring/{id}/hold
+Marks given recurring pattern as pattern on hold - which will result in pattern not being
+terminated during pattern detection if it stopped occurring.
+RecurringPatternComment
+Series
+GET
+/user/cashflow/v2/upcoming/series
+Returns upcoming transactions series grouped by a selected aggregate key.
+Parameters
+Name Description
+aggregationProperty
+string
+(query)
+The property by which the series will be aggregated.
+Available values : AccountId
+--
+dateFrom
+string($date-time)
+(query)
+The minimum date and time (inclusive) for which upcoming transactions in the returned series
+will be included. The value should correspond to the server's local time zone and should be sent
+without a time zone marker.
+2026-03-18T13:04:40.7536978
+dateTo
+string($date-time)
+(query)
+The maximum date and time (inclusive) for which upcoming transactions in the returned series
+will be included. The value should correspond to the server's local time zone and should be sent
+without a time zone marker.
+2026-03-18T13:04:40.7539021
+accountIds
+array[integer]
+(query)
+Account IDs for which upcoming transactions will be included in the returned series. This
+parameter is optional. If empty, series for all user accounts will be used. The value should
+correspond to the server's local time zone and should be sent without a time zone marker.
+includeDisabledAccounts
+boolean
+(query)
+Whether or not to include upcoming transactions from disabled accounts in the result. This
+parameter is ignored when the accountIds parameter is used.
+--
+Responses
+Code Description Links
+200
+Success
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"aggregate": "string"
+,
+"values": [
+{
+"currencyCode": "string"
+,
+"total": 0
+}
+]
+}
+]
+}
+No links
+400
+Bad Request
+Media type
+application/json
+{
+"errors": [
+{
+"message": "string"
+,
+"messageDetails": "string"
+}
+]
+}
+No links
+Subscriptions
+GET
+/user/cashflow/v2/upcoming/subscriptions
+Parameters
+Name Description
+skip
+integer($int32)
+(query)
+Default value : 0
+0
+take
+integer($int32)
+(query)
+Default value : 1000
+1000
+Responses
+Code Description Links
+200
+Success
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"accountId": 0,
+"amountInCurrency": 0,
+"categoryId": 0,
+"comments": [
+{
+"comment": "string"
+,
+"id": 0
+}
+],
+"currencyCode": "string"
+,
+"customData": "string"
+,
+"detectedCategories": [
+{
+"categoryId": 0,
+"score": 0
+}
+],
+"hasUncertainCategorization": true,
+"id": 0,
+"isFlagged": true,
+"isSubscription": true,
+"isUserCategory": true,
+"isWatched": true,
+"pattern": {
+"cronExpression": "string"
+,
+"dayOfMonth": "string"
+,
+"dayOfMonthInterval": 0,
+"dayOfWeek": "string"
+,
+"dayOfWeekInterval": 0,
+"daysOfMonth": [
+{
+"interval": 0,
+"value": "string"
+}
+],
+"daysOfWeek": [
+{
+"interval": 0,
+"value": "string"
+}
+],
+"month": "string"
+,
+"monthInterval": 0,
+"months": [
+{
+"interval": 0,
+"value": "January"
+}
+],
+"weekInterval": 0,
+"weekOfYear": 0,
+"weeksOfYear": [
+{
+"interval": 0,
+"value": 0
+}
+]
+},
+"repeatUntil": "2026-03-18T13:04:40.759163"
+"scheduledPaymentId": 0,
+"status": "Unknown"
+,
+,
+"tags": [
+{
+"id": 0,
+"name": "string"
+}
+],
+"text": "string"
+,
+"transactionIds": [
+0
+],
+"type": "Unknown"
+}
+],
+"meta": {
+"totalCount": 0
+}
+}
+No links
+UpcomingTags
+GET
+/user/cashflow/v2/upcoming/tags
+Get all upcoming tags
+Parameters
+No parameters
+Responses
+Code Description Links
+200
+Success
+Media type
+application/json
+Controls Accept header.
+{
+"data": [
+{
+"id": 0,
+"name": "string"
+}
+}
+]
+No links
+GET
+/user/cashflow/v2/upcoming/tags/{id}
+Get upcoming tag of specified id
+Parameters
+Name Description
+id *
+integer($int64)
+(path)
+A identifier of upcoming tag
+id
+Responses
+Code Description Links
+200
+Success
+Media type
+application/json
+Controls Accept header.
+{
+"data": {
+"id": 0,
+"name": "string"
+}
+}
+No links
+404
+Not Found
+Media type
+application/json
+{
+"errors": [
+{
+"message": "string"
+,
+"messageDetails": "string"
+}
+]
+}
+No links
+
+---
+
+GET
+/user/carbonaction/v1/projects
+Returns a collection of active offsetting projects.
+Parameters
+No parameters
+
+Responses
+Code	Description	Links
+200	
+OK
+
+Media type
+
+application/json
+Controls Accept header.
+{
+  "data": [
+    {
+      "country": "string",
+      "creditPriceInEuro": 0,
+      "creditsBalance": 0,
+      "description": "string",
+      "id": 0,
+      "media": {
+        "additionalProp1": "string",
+        "additionalProp2": "string",
+        "additionalProp3": "string"
+      },
+      "name": "string",
+      "providerLogoUrl": "string",
+      "providerName": "string",
+      "type": "string"
+    }
+  ]
+}
+No links
+401	
+Unauthorized
+
+No links
+403	
+Forbidden
+
+No links
+
+GET
+/user/carbonaction/v1/projects/transactions
+Returns a collection of user's transactions.
+Parameters
+Name	Description
+dateCreatedFrom
+string($date-time)
+(query)
+The minimum offsetting transaction's creation date to filter by (inclusive). If empty, it will be ignored.
+
+dateCreatedFrom
+dateCreatedTo
+string($date-time)
+(query)
+The maximum offsetting transaction's creation date to filter by (inclusive). If empty, it will be ignored.
+
+dateCreatedTo
+projectName
+string
+(query)
+Part of Project's name to filter by. If empty, it will be ignored.
+
+projectName
+sort
+string
+(query)
+Decides the order of the returned offsetting transactions, defined by a comma separated list of properties. The sort order for each sort field is ascending unless it is prefixed with a "-" in which case it is descending. If sort field is null or empty then default sorting is applied (TransactionId descending) The supported fields are: DateCreated, ProjectName The string "DateCreated,-ProjectName" results in the offsetting transactions being sorted by DateCreated ascending, ProjectName descending.
+
+sort
+Responses
+Code	Description	Links
+200	
+OK
+
+Media type
+
+application/json
+Controls Accept header.
+{
+  "data": [
+    {
+      "amountInEuro": 0,
+      "amountInUserCurrency": 0,
+      "created": "2022-05-30T12:01:27.035Z",
+      "id": 123,
+      "offsetCarbonFootprintInKg": 10.5,
+      "paymentStatus": "Pending",
+      "projectId": 23,
+      "userCurrency": "USD"
+    }
+  ]
+}
+No links
+401	
+Unauthorized
+
+No links
+403	
+Forbidden
+
+No links
+
+GET
+/user/carbonaction/v1/projects/{id}
+Returns details of the active offsetting project
+Parameters
+Name	Description
+id *
+integer($int64)
+(path)
+Identifier of the project
+
+id
+Responses
+Code	Description	Links
+200	
+OK
+
+Media type
+
+application/json
+Controls Accept header.
+{
+  "data": {
+    "country": "string",
+    "creditPriceInEuro": 0,
+    "creditsBalance": 0,
+    "description": "string",
+    "id": 0,
+    "media": {
+      "additionalProp1": "string",
+      "additionalProp2": "string",
+      "additionalProp3": "string"
+    },
+    "name": "string",
+    "providerLogoUrl": "string",
+    "providerName": "string",
+    "type": "string"
+  }
+}
+No links
+401	
+Unauthorized
+
+No links
+403	
+Forbidden
+
+No links
+404	
+Not Found
+
+Media type
+
+application/json
+{
+  "errors": [
+    {
+      "message": "string",
+      "messageDetails": "string",
+      "modelState": {
+        "additionalProp1": [
+          "string"
+        ],
+        "additionalProp2": [
+          "string"
+        ],
+        "additionalProp3": [
+          "string"
+        ]
+      }
+    }
+  ]
+}
+No links
+
+POST
+/user/carbonaction/v1/projects/{projectId}/transactions
+Offsets carbon footprint by purchasing Carbon Credits in a given project and creating a new Offsetting transaction
+
+GET
+/user/carbonaction/v1/projects/{projectId}/transactions/calculate
+For the specified project performs a calculation of a transaction's price and offset CO2 weight, which could be made either to offset provided CO2 weight or for given amount of money
+Parameters
+Name	Description
+projectId *
+integer($int64)
+(path)
+projectId
+carbonToOffsetInKg
+number($double)
+(query)
+Weight of CO2 (in kilograms) to be offset
+
+carbonToOffsetInKg
+amountInEuro
+number($double)
+(query)
+Amount (in euro) to be invested in offsetting transaction
+
+Example : 100.25
+
+100.25
+Responses
+Code	Description	Links
+200	
+OK
+
+Media type
+
+application/json
+Controls Accept header.
+{
+  "data": {
+    "amountInEuro": 0,
+    "carbonCredits": 0,
+    "carbonToOffsetInKg": 0,
+    "projectId": 0,
+    "projectVersionId": 0
+  }
+}
+No links
+401	
+Unauthorized
+
+No links
+403	
+Forbidden
+
+No links
+404	
+Not Found
+
+Media type
+
+application/json
+{
+  "errors": [
+    {
+      "message": "string",
+      "messageDetails": "string",
+      "modelState": {
+        "additionalProp1": [
+          "string"
+        ],
+        "additionalProp2": [
+          "string"
+        ],
+        "additionalProp3": [
+          "string"
+        ]
+      }
+    }
+  ]
+}
+
+----
+
+GET
+/user/smartmoney/v1/auth
+Verify authentication
+Parameters
+No parameters
+
+Responses
+Code	Description	Links
+200	
+OK
+
+Media type
+
+application/json
+Controls Accept header.
+{
+  "data": {
+    "shardingKey": "string",
+    "tenant": "string",
+    "userIdentifier": "string"
+  }
+}
+No links
+RuleDefinitions
+
+GET
+/user/smartmoney/v1/rules/definitions
+Parameters
+No parameters
+
+Responses
+Code	Description	Links
+200	
+OK
+
+Media type
+
+application/json
+Controls Accept header.
+{
+  "data": [
+    {
+      "activeInstancesCount": 0,
+      "deactivatedInstancesCount": 0,
+      "destinationAccountOptions": {
+        "canBeConstantAccountTransfer": true,
+        "canBeExternalAccountTransfer": true,
+        "canBeOwnAccountTransfer": true,
+        "constantAccountIdentifier": "string",
+        "constantAccountName": "string"
+      },
+      "hasEverBeenUsed": true,
+      "parameters": [
+        {
+          "defaultValue": "string",
+          "isConstant": true,
+          "name": "string",
+          "numberFrom": "string",
+          "numberTo": "string",
+          "options": [
+            "string"
+          ]
+        }
+      ],
+      "ruleDefinitionCategory": "saving",
+      "ruleDefinitionId": 0,
+      "ruleDefinitionType": "roundUpRule"
+    }
+  ]
+}
+No links
+401	
+Unauthorized
+
+Media type
+
+application/json
+{
+  "detail": "string",
+  "extensions": {
+    "additionalProp1": "string",
+    "additionalProp2": "string",
+    "additionalProp3": "string"
+  },
+  "instance": "string",
+  "status": "string",
+  "title": "string",
+  "type": "string"
+}
+No links
+RuleInstances
+
+GET
+/user/smartmoney/v1/rules/instances
+Parameters
+No parameters
+
+Responses
+Code	Description	Links
+200	
+OK
+
+Media type
+
+application/json
+Controls Accept header.
+{
+  "data": [
+    {
+      "deactivatedDate": "string",
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "isActive": true,
+      "name": "string",
+      "parameters": {
+        "additionalProp1": "string",
+        "additionalProp2": "string",
+        "additionalProp3": "string"
+      },
+      "ruleDefinitionCategory": "saving",
+      "ruleDefinitionId": 0,
+      "ruleDefinitionType": "roundUpRule",
+      "ruleInstanceVersionId": 0
+    }
+  ]
+}
+No links
+401	
+Unauthorized
+
+Media type
+
+application/json
+{
+  "detail": "string",
+  "extensions": {
+    "additionalProp1": "string",
+    "additionalProp2": "string",
+    "additionalProp3": "string"
+  },
+  "instance": "string",
+  "status": "string",
+  "title": "string",
+  "type": "string"
+}
+No links
+
+POST
+/user/smartmoney/v1/rules/instances/deactivate
+
+POST
+/user/smartmoney/v1/rules/instances/reactivate
+GuiltyPleasureInstance
+IncomePercentageInstance
+IntervalRuleInstance
+PercentageInstance
+RoundUpRuleInstance
+Simulation
+Transfers
+
+GET
+/user/smartmoney/v1/transfers
+Parameters
+Name	Description
+ruleDefinitionsIds
+array[integer]
+(query)
+ruleInstancesIds
+array[string]
+(query)
+ruleTypes
+array[string]
+(query)
+Available values : RoundUp, Interval, GuiltyPleasure, Percentage, IncomePercentage
+
+--RoundUpIntervalGuiltyPleasurePercentageIncomePercentage
+ruleInstanceState
+string
+(query)
+Available values : All, OnlyInactive, OnlyActive
+
+
+--
+currency
+string
+(query)
+currency
+amountFrom
+string
+(query)
+amountFrom
+amountTo
+string
+(query)
+amountTo
+dateFrom
+string
+(query)
+dateFrom
+dateTo
+string
+(query)
+dateTo
+Responses
+Code	Description	Links
+200	
+OK
+
+Media type
+
+application/json
+Controls Accept header.
+{
+  "data": [
+    {
+      "amount": 0,
+      "currency": "string",
+      "ruleInstanceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "ruleInstanceName": "string",
+      "sourceTransactionId": "string",
+      "transactionDate": "string",
+      "transactionId": 0,
+      "transferDate": "2026-03-25T22:10:44.679Z"
+    }
+  ]
+}
+No links
+401	
+Unauthorized
+
+Media type
+
+application/json
+{
+  "detail": "string",
+  "extensions": {
+    "additionalProp1": "string",
+    "additionalProp2": "string",
+    "additionalProp3": "string"
+  },
+  "instance": "string",
+  "status": "string",
+  "title": "string",
+  "type": "string"
+}
