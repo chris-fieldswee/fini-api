@@ -1,0 +1,3262 @@
+using System.ComponentModel;
+using System.Text;
+using Meniga.Clients.UserApi;
+using Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models;
+using Microsoft.SemanticKernel;
+namespace Meniga.AI.Plugins;
+/// <summary>
+/// Provides transaction query and search functions.
+/// </summary>
+public sealed class Transactions(UserApiClient userApiClient)
+{
+[KernelFunction("get
+last
+_
+_
+transactions")]
+[Description("Gets the list of recent transactions of the user.
+")]
+public async Task<string> GetLastTransactions(
+[Description("maximum number of transactions")] int count)
+{
+var response = await
+userApiClient.User.Core.V1.Transactions.GetAsync(requestConfiguration =>
+{
+requestConfiguration.QueryParameters.OriginalPeriodFrom =
+DateTimeOffset.UtcNow.AddDays(-DateTime.UtcNow.Day);
+requestConfiguration.QueryParameters.OriginalPeriodTo = DateTimeOffset.UtcNow;
+requestConfiguration.QueryParameters.Take = count;
+});
+var transactions = response?.Data ?? [];
+return string.Join($"{Environment.NewLine}---{Environment.NewLine}"
+,
+transactions.Select(x => new
+{
+x.Date,
+x.Amount,
+x.Currency,
+x.AccountId,
+x.Text
+}));
+}
+[KernelFunction("search
+transactions
+_
+_
+by_
+label")]
+[Description("Searches for transactions by label or description text.
+")]
+public async Task<string> SearchTransactionsByLabel(
+[Description("Search term to look for in transaction labels")] string searchTerm)
+{
+// Validate input
+if (string.IsNullOrWhiteSpace(searchTerm))
+{
+return "Please provide a search term to search for.
+";
+}
+// Query transactions API with text search
+var response = await
+userApiClient.User.Core.V1.Transactions.GetAsync(requestConfiguration =>
+{
+// Use built-in text search across multiple fields
+requestConfiguration.QueryParameters.SearchText = searchTerm;
+requestConfiguration.QueryParameters.SearchTextFields =
+"text,originalText,category,tags,comments";
+requestConfiguration.QueryParameters.UseAccentInsensitiveSearch = true;
+// Limit results to prevent overwhelming output
+requestConfiguration.QueryParameters.Take = 50;
+// Optional: search within last year for better relevance
+// requestConfiguration.QueryParameters.OriginalPeriodFrom =
+DateTimeOffset.UtcNow.AddYears(-1);
+});
+var transactions = response?.Data ?? [];
+// Handle no results
+if (transactions.Count == 0)
+{
+return $"No transactions found matching '{searchTerm}'
+.
+";
+}
+// Build formatted output
+var result = new StringBuilder();
+result.AppendLine($"Search Results for \"{searchTerm}\":");
+result.AppendLine("
+---
+");
+// Sort by date descending (most recent first)
+var sortedTransactions = transactions
+.Where(t => t.Date.HasValue && t.Amount.HasValue)
+.OrderByDescending(t => t.Date!.Value)
+.ToList();
+// Show each transaction
+foreach (var transaction in sortedTransactions)
+{
+result.AppendLine($"{transaction.Date!.Value:yyyy-MM-dd}");
+// Format amount with sign
+var amount = transaction.Amount!.Value;
+var amountSign = amount >= 0 ? "+" : "";
+result.AppendLine($"{amountSign}{amount:F2} {transaction.Currency ?? "EUR"}");
+// Transaction text/description
+if (!string.IsNullOrWhiteSpace(transaction.Text))
+{
+result.AppendLine(transaction.Text);
+}
+// Account ID
+result.AppendLine($"Account ID: {transaction.AccountId}");
+// Category (if available)
+if (transaction.CategoryId.HasValue && transaction.CategoryId.Value > 0)
+{
+result.AppendLine($"Category ID: {transaction.CategoryId.Value}");
+}
+// Bank ID / Reference (if available)
+if (!string.IsNullOrWhiteSpace(transaction.BankId))
+{
+result.AppendLine($"Reference: {transaction.BankId}");
+}
+// Tags (if available)
+if (transaction.Tags != null && transaction.Tags.Count > 0)
+{
+result.AppendLine($"Tags: {string.Join("
+,
+"
+, transaction.Tags)}");
+}
+// Comments (if available)
+if (transaction.Comments != null && transaction.Comments.Count > 0)
+{
+result.AppendLine("Comments:");
+foreach (var comment in transaction.Comments)
+{
+result.AppendLine($" • {comment.Comment}");
+}
+}
+result.AppendLine("
+---
+");
+}
+// Calculate summary statistics
+var totalCount = sortedTransactions.Count;
+var totalAmount = sortedTransactions.Sum(t => t.Amount ?? 0);
+var totalIncoming = sortedTransactions.Where(t => t.Amount > 0).Sum(t => t.Amount ?? 0);
+var totalOutgoing = sortedTransactions.Where(t => t.Amount < 0).Sum(t => t.Amount ?? 0);
+result.AppendLine("Summary:");
+result.AppendLine($"Total Found: {totalCount} transaction{(totalCount != 1 ? "s" : "")}");
+result.AppendLine($"Total Amount: {totalAmount:F2} EUR");
+// Show breakdown if both incoming and outgoing exist
+if (totalIncoming > 0 && totalOutgoing < 0)
+{
+result.AppendLine($"Incoming: +{totalIncoming:F2} EUR");
+result.AppendLine($"Outgoing: {totalOutgoing:F2} EUR");
+result.AppendLine($"Net: {totalAmount:F2} EUR");
+}
+// Show date range
+if (sortedTransactions.Count > 1)
+{
+var oldestDate = sortedTransactions.Last().Date!.Value;
+var newestDate = sortedTransactions.First().Date!.Value;
+result.AppendLine($"Period: {oldestDate:yyyy-MM-dd} to {newestDate:yyyy-MM-dd}");
+}
+return result.ToString();
+}
+[KernelFunction("search
+_
+incoming_
+transfers")]
+[Description("Searches for incoming transfers from a specific sender by name or identifier.
+")]
+public async Task<string> SearchIncomingTransfers(
+[Description("Name or identifier of the sender to search for")] string senderName)
+{
+// Validate input
+if (string.IsNullOrWhiteSpace(senderName))
+{
+return "Please provide a sender name to search for.
+";
+}
+// Query transactions API for incoming transactions matching the sender name
+var response = await
+userApiClient.User.Core.V1.Transactions.GetAsync(requestConfiguration =>
+{
+// Search for incoming transactions (positive amounts only)
+requestConfiguration.QueryParameters.AmountFrom = 0.01; // Only positive (incoming)
+// Search across multiple fields where sender info might appear
+requestConfiguration.QueryParameters.SearchText = senderName;
+requestConfiguration.QueryParameters.SearchTextFields =
+"text,originalText,parsedData.sender
+_
+name,parsedData.beneficiary_
+name,parsedData.counterp
+arty_
+name";
+requestConfiguration.QueryParameters.UseAccentInsensitiveSearch = true;
+// Exclude merchant transactions (transfers are typically person-to-person)
+requestConfiguration.QueryParameters.IsMerchant = false;
+// Limit results
+requestConfiguration.QueryParameters.Take = 50;
+// Sort by date descending (most recent first)
+requestConfiguration.QueryParameters.Sort = "
+-Date";
+});
+var transactions = response?.Data ?? [];
+// Filter and score transactions based on transfer indicators
+var transferCandidates = new List<(TransactionModel Transaction, string Confidence,
+string TransferType)>();
+foreach (var transaction in transactions)
+{
+// Skip if no amount or date
+if (!transaction.Amount.HasValue || !transaction.Date.HasValue)
+continue;
+// Double-check it's incoming (positive amount)
+if (transaction.Amount.Value <= 0)
+continue;
+string confidence;
+string transferType;
+// HIGH confidence: Has counterparty account identifier
+if (!string.IsNullOrWhiteSpace(transaction.CounterpartyAccountIdentifier))
+{
+confidence = "HIGH";
+transferType = "Person-to-Person Transfer";
+}
+// HIGH confidence: ParsedData contains sender info
+else if (transaction.ParsedData != null &&
+transaction.ParsedData.Any(pd =>
+pd.Key != null &&
+(pd.Key.Contains("sender"
+, StringComparison.OrdinalIgnoreCase) ||
+pd.Key.Contains("beneficiary"
+, StringComparison.OrdinalIgnoreCase) ||
+pd.Key.Contains("counterparty"
+, StringComparison.OrdinalIgnoreCase))))
+{
+confidence = "HIGH";
+transferType = "Bank Transfer";
+}
+// MEDIUM confidence: Text contains transfer keywords
+else if (transaction.Text != null &&
+(transaction.Text.Contains("Transfer from"
+, StringComparison.OrdinalIgnoreCase)
+||
+transaction.Text.Contains("From:"
+, StringComparison.OrdinalIgnoreCase) ||
+transaction.Text.Contains("P2P"
+, StringComparison.OrdinalIgnoreCase) ||
+transaction.Text.Contains("Mobile transfer"
+,
+StringComparison.OrdinalIgnoreCase)))
+{
+confidence = "MEDIUM";
+transferType = "Bank Transfer";
+}
+// MEDIUM confidence: Has transfer-related tags
+else if (transaction.Tags != null &&
+transaction.Tags.Any(tag =>
+tag.Contains("transfer"
+, StringComparison.OrdinalIgnoreCase) ||
+tag.Contains("personal"
+, StringComparison.OrdinalIgnoreCase) ||
+tag.Contains("p2p"
+, StringComparison.OrdinalIgnoreCase)))
+{
+confidence = "MEDIUM";
+transferType = "Personal Transfer";
+}
+// LOW confidence: Just name match in text (could be payment TO them, not FROM)
+else if (transaction.Text != null &&
+transaction.Text.Contains(senderName, StringComparison.OrdinalIgnoreCase))
+{
+confidence = "LOW";
+transferType = "Possible Transfer";
+}
+else
+{
+// Skip - no transfer indicators
+continue;
+}
+transferCandidates.Add((transaction, confidence, transferType));
+}
+// Handle no results
+if (transferCandidates.Count == 0)
+{
+return $"No incoming transfers found from '{senderName}'
+.
+";
+}
+// Build formatted output
+var result = new StringBuilder();
+result.AppendLine($"Incoming Transfers from \"{senderName}\":");
+result.AppendLine("
+---
+");
+result.AppendLine($"Found: YES ✓ ({transferCandidates.Count}
+transfer{(transferCandidates.Count != 1 ? "s" : "")})");
+result.AppendLine("
+---
+");
+// Show each transfer
+foreach (var (transaction, confidence, transferType) in
+transferCandidates.OrderByDescending(t => t.Transaction.Date))
+{
+result.AppendLine($"{transaction.Date!.Value:yyyy-MM-dd}");
+result.AppendLine($"+{transaction.Amount!.Value:F2} {transaction.Currency ??
+"EUR"}");
+if (!string.IsNullOrWhiteSpace(transaction.Text))
+{
+result.AppendLine($"From: {transaction.Text}");
+}
+result.AppendLine($"Type: {transferType}");
+// Show counterparty identifier if available
+if (!string.IsNullOrWhiteSpace(transaction.CounterpartyAccountIdentifier))
+{
+result.AppendLine($"Reference: {transaction.CounterpartyAccountIdentifier}");
+else if (!string.IsNullOrWhiteSpace(transaction.BankId))
+result.AppendLine($"Reference: {transaction.BankId}");
+}
+{
+}
+{
+// Show ParsedData sender info if available
+if (transaction.ParsedData != null)
+var senderData = transaction.ParsedData
+.Where(pd => pd.Key != null &&
+(pd.Key.Contains("sender"
+, StringComparison.OrdinalIgnoreCase) ||
+pd.Key.Contains("beneficiary"
+, StringComparison.OrdinalIgnoreCase) ||
+pd.Key.Contains("counterparty"
+, StringComparison.OrdinalIgnoreCase)))
+.ToList();
+foreach (var data in senderData)
+{
+result.AppendLine($"{data.Key}: {data.Value}");
+}
+}
+// Show tags if available
+if (transaction.Tags != null && transaction.Tags.Count > 0)
+{
+result.AppendLine($"Tags: {string.Join("
+,
+"
+, transaction.Tags)}");
+}
+// Show comments if available
+if (transaction.Comments != null && transaction.Comments.Count > 0)
+{
+result.AppendLine("Comments:");
+foreach (var comment in transaction.Comments)
+{
+result.AppendLine($" • {comment.Comment}");
+}
+}
+// Show status
+var status = transaction.IsUncleared ?? false ? "Pending" : "Completed";
+result.AppendLine($"Status: {status}");
+// Show confidence level
+result.AppendLine($"Confidence: {confidence}");
+result.AppendLine("
+---
+");
+}
+// Summary
+var totalAmount = transferCandidates.Sum(t => t.Transaction.Amount ?? 0);
+var mostRecent = transferCandidates.OrderByDescending(t => t.Transaction.Date).First();
+result.AppendLine("Summary:");
+result.AppendLine($"Total Received: {totalAmount:F2} EUR");
+result.AppendLine($"Number of Transfers: {transferCandidates.Count}");
+result.AppendLine($"Most Recent: {mostRecent.Transaction.Date!.Value:yyyy-MM-dd}
+({mostRecent.Transaction.Amount:F2} EUR)");
+return result.ToString();
+}
+[KernelFunction("get
+transactions
+_
+_
+by_
+date
+and
+_
+_
+category")]
+[Description("Gets transactions filtered by category and date range.
+")]
+public async Task<string> GetTransactionsByDateAndCategory(
+[Description("Category to filter by")] string category,
+[Description("Start date in YYYY-MM-DD format")] string startDate,
+[Description("End date in YYYY-MM-DD format")] string endDate)
+{
+// Parse dates
+if (!DateTimeOffset.TryParse(startDate, out var periodFrom))
+{
+periodFrom = new DateTimeOffset(DateTime.UtcNow.Year, 1, 1, 0, 0, 0,
+TimeSpan.Zero);
+}
+if (!DateTimeOffset.TryParse(endDate, out var periodTo))
+{
+periodTo = DateTimeOffset.UtcNow;
+}
+// Fetch all categories to find matching ones
+var categoriesResponse = await userApiClient.User.Core.V1.Categories.GetAsync();
+var allCategories = categoriesResponse?.Data ?? [];
+// Search for categories matching the requested category name (fuzzy match)
+var matchingCategories = allCategories
+.Where(c => c.Name != null && c.Name.Contains(category,
+StringComparison.OrdinalIgnoreCase))
+.ToList();
+// Also check child categories
+foreach (var cat in allCategories.Where(c => c.Children != null))
+{
+var matchingChildren = cat.Children!
+.Where(c => c.Name != null && c.Name.Contains(category,
+StringComparison.OrdinalIgnoreCase))
+.ToList();
+matchingCategories.AddRange(matchingChildren);
+}
+var categoryIds = matchingCategories
+.Select(c => c.Id)
+.Where(id => id.HasValue)
+.Select(id => (int?)id!.Value)
+.Distinct()
+.ToList();
+if (categoryIds.Count == 0)
+return $"No categories found matching '{category}'
+.
+";
+{
+}
+// Fetch transactions for the matching categories
+var request = new TransactionSeriesRequest
+{
+TransactionFilter = new TransactionFilter
+{
+PeriodFrom = periodFrom,
+PeriodTo = periodTo,
+CategoryIds = categoryIds
+},
+{
+Options = new TransactionSeriesOptions
+OverTime = false,
+IncludeTransactions = true
+}
+};
+var response = await userApiClient.User.Core.V1.Transactions.Series.PostAsync(request);
+if (response?.Data == null || response.Data.Count == 0)
+return $"No transactions found for category '{category}' in the specified period.
+";
+{
+}
+// Extract and format transactions
+var allTransactions = new List<TransactionModel>();
+foreach (var series in response.Data)
+{
+if (series.Transactions != null)
+{
+allTransactions.AddRange(series.Transactions);
+}
+}
+{
+}
+if (allTransactions.Count == 0)
+return $"No transactions found for category '{category}' in the specified period.
+";
+// Sort transactions by date (most recent first)
+var sortedTransactions = allTransactions
+.Where(t => t.Date.HasValue && t.Amount.HasValue)
+.OrderByDescending(t => t.Date!.Value)
+.ToList();
+// Calculate total
+var total = sortedTransactions.Sum(t => Math.Abs(t.Amount!.Value));
+// Build output
+var result = new StringBuilder();
+var categoryNames = string.Join("
+"
+,
+, matchingCategories.Select(c => c.Name).Distinct());
+result.AppendLine($"Category: {categoryNames}");
+result.AppendLine($"Period: {periodFrom:yyyy-MM-dd} to {periodTo:yyyy-MM-dd}");
+foreach (var transaction in sortedTransactions)
+{
+result.AppendLine("
+---
+");
+result.AppendLine($"{transaction.Date!.Value:yyyy-MM-dd}");
+result.AppendLine($"{Math.Abs(transaction.Amount!.Value):F2} {transaction.Currency ??
+"EUR"}");
+result.AppendLine(transaction.Text ?? "Transaction");
+}
+result.AppendLine("
+---
+");
+result.AppendLine($"Total: {total:N2} EUR");
+result.AppendLine($"Number of Transactions: {sortedTransactions.Count}");
+return result.ToString();
+}
+[KernelFunction("get
+transactions
+_
+_
+by_
+category")]
+[Description("Gets recent transactions filtered by category.
+")]
+public async Task<string> GetTransactionsByCategory(
+[Description("Category to filter by")] string category,
+[Description("Number of transactions to retrieve")] int count)
+{
+// Set time window to last 3 months to find recent transactions
+var now = DateTimeOffset.UtcNow;
+var periodFrom = now.AddMonths(-3);
+// Fetch all categories to find matching ones
+var categoriesResponse = await userApiClient.User.Core.V1.Categories.GetAsync();
+var allCategories = categoriesResponse?.Data ?? [];
+// Search for categories matching the requested category name (fuzzy match)
+var matchingCategories = allCategories
+.Where(c => c.Name != null && c.Name.Contains(category,
+StringComparison.OrdinalIgnoreCase))
+.ToList();
+// Also check child categories
+foreach (var cat in allCategories.Where(c => c.Children != null))
+{
+var matchingChildren = cat.Children!
+.Where(c => c.Name != null && c.Name.Contains(category,
+StringComparison.OrdinalIgnoreCase))
+.ToList();
+matchingCategories.AddRange(matchingChildren);
+}
+var categoryIds = matchingCategories
+.Select(c => c.Id)
+.Where(id => id.HasValue)
+.Select(id => (int?)id!.Value)
+.Distinct()
+.ToList();
+if (categoryIds.Count == 0)
+{
+return $"No categories found matching '{category}'
+.
+";
+}
+// Fetch transactions for the matching categories
+var request = new TransactionSeriesRequest
+{
+TransactionFilter = new TransactionFilter
+{
+PeriodFrom = periodFrom,
+PeriodTo = now,
+CategoryIds = categoryIds
+},
+{
+Options = new TransactionSeriesOptions
+OverTime = false,
+IncludeTransactions = true
+}
+};
+var response = await userApiClient.User.Core.V1.Transactions.Series.PostAsync(request);
+if (response?.Data == null || response.Data.Count == 0)
+{
+return $"No transactions found for category '{category}'
+.
+";
+}
+// Extract and sort transactions
+var allTransactions = new List<TransactionModel>();
+foreach (var series in response.Data)
+{
+if (series.Transactions != null)
+{
+allTransactions.AddRange(series.Transactions);
+}
+}
+if (allTransactions.Count == 0)
+{
+return $"No transactions found for category '{category}'
+.
+";
+}
+// Sort by date (most recent first) and take requested count
+var recentTransactions = allTransactions
+.Where(t => t.Date.HasValue && t.Amount.HasValue)
+.OrderByDescending(t => t.Date!.Value)
+.Take(count)
+.ToList();
+// Calculate total
+var total = recentTransactions.Sum(t => Math.Abs(t.Amount!.Value));
+// Build output
+var result = new StringBuilder();
+var categoryNames = string.Join("
+"
+,
+, matchingCategories.Select(c => c.Name).Distinct());
+result.AppendLine($"Category: {categoryNames}");
+foreach (var transaction in recentTransactions)
+{
+result.AppendLine("
+---
+");
+result.AppendLine($"{transaction.Date!.Value:yyyy-MM-dd}");
+result.AppendLine($"{Math.Abs(transaction.Amount!.Value):F2} {transaction.Currency ??
+"EUR"}");
+result.AppendLine(transaction.Text ?? "Transaction");
+}
+result.AppendLine("
+---
+");
+result.AppendLine($"Total (Last {recentTransactions.Count}): {total:N2} EUR");
+return result.ToString();
+}
+[KernelFunction("get
+_
+expenses
+_
+by_
+category")]
+[Description("Gets expenses for a specific category and time period with monthly
+breakdown.
+")]
+public async Task<string> GetExpensesByCategory(
+[Description("Start date in YYYY-MM-DD format")] string startDate,
+[Description("End date in YYYY-MM-DD format")] string endDate,
+[Description("Category to filter by")] string category)
+{
+// Parse dates
+if (!DateTimeOffset.TryParse(startDate, out var periodFrom))
+{
+// Default to last year if not specified
+var now = DateTimeOffset.UtcNow;
+periodFrom = new DateTimeOffset(now.Year - 1, 1, 1, 0, 0, 0, TimeSpan.Zero);
+}
+if (!DateTimeOffset.TryParse(endDate, out var periodTo))
+{
+// Default to end of last year if not specified
+var now = DateTimeOffset.UtcNow;
+periodTo = new DateTimeOffset(now.Year - 1, 12, 31, 23, 59, 59, TimeSpan.Zero);
+}
+// Fetch all categories to find matching ones
+var categoriesResponse = await userApiClient.User.Core.V1.Categories.GetAsync();
+var allCategories = categoriesResponse?.Data ?? [];
+// Search for categories matching the requested category name (fuzzy match)
+var matchingCategories = allCategories
+.Where(c => c.Name != null && c.Name.Contains(category,
+StringComparison.OrdinalIgnoreCase))
+.ToList();
+// Also check child categories
+foreach (var cat in allCategories.Where(c => c.Children != null))
+{
+var matchingChildren = cat.Children!
+.Where(c => c.Name != null && c.Name.Contains(category,
+StringComparison.OrdinalIgnoreCase))
+.ToList();
+matchingCategories.AddRange(matchingChildren);
+}
+var categoryIds = matchingCategories
+.Select(c => c.Id)
+.Where(id => id.HasValue)
+.Select(id => (int?)id!.Value)
+.Distinct()
+.ToList();
+if (categoryIds.Count == 0)
+{
+return $"No categories found matching '{category}'
+.
+";
+}
+// Fetch transactions using GetAsync and manually aggregate by month
+// Note: GetAsync doesn't support array filtering directly, so we'll need to fetch
+// transactions and filter by category IDs in memory, or make multiple calls
+// For simplicity, we'll fetch all transactions in the period and filter
+var response = await
+userApiClient.User.Core.V1.Transactions.GetAsync(requestConfiguration =>
+{
+requestConfiguration.QueryParameters.PeriodFrom = periodFrom;
+requestConfiguration.QueryParameters.PeriodTo = periodTo;
+// Filter for expense transactions (negative amounts only)
+requestConfiguration.QueryParameters.AmountTo = -0.01;
+// Set a reasonable limit to avoid performance issues
+requestConfiguration.QueryParameters.Take = 500;
+});
+var transactions = response?.Data ?? [];
+if (transactions.Count == 0)
+{
+return $"No expenses found for category '{category}' in the specified period.
+";
+}
+// Filter transactions by matching category IDs
+var filteredTransactions = transactions
+.Where(t => t.CategoryId.HasValue && categoryIds.Contains(t.CategoryId.Value))
+.Where(t => t.Date.HasValue && t.Amount.HasValue)
+.ToList();
+if (filteredTransactions.Count == 0)
+{
+return $"No expenses found for category '{category}' in the specified period.
+";
+}
+// Group transactions by month and calculate monthly totals
+var monthlyGroups = filteredTransactions
+.GroupBy(t => new { t.Date!.Value.Year, t.Date!.Value.Month })
+.Select(g => new
+{
+Date = new DateTimeOffset(g.Key.Year, g.Key.Month, 1, 0, 0, 0, TimeSpan.Zero),
+Total = g.Sum(t => Math.Abs(t.Amount!.Value))
+})
+.OrderBy(m => m.Date)
+.ToList();
+// Calculate total and build monthly breakdown
+var result = new StringBuilder();
+var categoryNames = string.Join("
+,
+"
+, matchingCategories.Select(c => c.Name).Distinct());
+result.AppendLine($"Period: {periodFrom:yyyy-MM-dd} to {periodTo:yyyy-MM-dd}");
+result.AppendLine($"Category: {categoryNames}");
+// Calculate total
+var total = monthlyGroups.Sum(m => m.Total);
+result.AppendLine($"Total Spent: {total:N0} EUR");
+result.AppendLine("
+---
+");
+result.AppendLine("Monthly Breakdown:");
+// Display each month
+foreach (var monthData in monthlyGroups)
+{
+if (monthData.Total > 0)
+{
+result.AppendLine($"{monthData.Date:MMMM yyyy}: {monthData.Total:N0} EUR");
+}
+}
+return result.ToString();
+}
+[KernelFunction("get
+_
+expenses
+_
+summary")]
+[Description("Gets a summary of expenses for a specified period with category breakdown.
+")]
+public async Task<string> GetExpensesSummary(
+[Description("Start date in YYYY-MM-DD format")] string startDate,
+[Description("End date in YYYY-MM-DD format")] string endDate)
+{
+// Parse dates
+if (!DateTimeOffset.TryParse(startDate, out var periodFrom))
+{
+periodFrom = new DateTimeOffset(DateTime.UtcNow.Year, 1, 1, 0, 0, 0,
+TimeSpan.Zero);
+}
+if (!DateTimeOffset.TryParse(endDate, out var periodTo))
+{
+periodTo = DateTimeOffset.UtcNow;
+}
+// Fetch all expense categories
+var categoriesResponse = await userApiClient.User.Core.V1.Categories.GetAsync();
+var allCategories = categoriesResponse?.Data ?? [];
+// Filter for expense categories only
+var expenseCategories = allCategories
+.Where(c => c.CategoryType == CategoryTypeEnum.Expenses)
+.ToList();
+if (expenseCategories.Count == 0)
+return "No expense categories found.
+";
+{
+}
+// Build series selectors for each expense category
+var seriesSelectors = new List<TransactionSeriesSelector>();
+var categoryMap = new Dictionary<int, string>();
+foreach (var category in expenseCategories)
+{
+if (category.Id.HasValue)
+{
+seriesSelectors.Add(new TransactionSeriesSelector
+{
+Filter = new TransactionFilter
+{
+CategoryIds = [category.Id.Value]
+}
+});
+categoryMap[seriesSelectors.Count - 1] = category.Name ?? "Unknown";
+}
+}
+// Create transaction series request
+var request = new TransactionSeriesRequest
+{
+TransactionFilter = new TransactionFilter
+{
+PeriodFrom = periodFrom,
+PeriodTo = periodTo
+},
+{
+Options = new TransactionSeriesOptions
+OverTime = false // Get total for the period, not time-series
+},
+SeriesSelectors = seriesSelectors
+};
+var response = await userApiClient.User.Core.V1.Transactions.Series.PostAsync(request);
+if (response?.Data == null || response.Data.Count == 0)
+return "No expense data found for the specified period.
+";
+{
+}
+// Aggregate results by category
+var categoryExpenses = new Dictionary<string, double>();
+double totalExpenses = 0;
+for (int i = 0; i < response.Data.Count && i < seriesSelectors.Count; i++)
+{
+var series = response.Data[i];
+var categoryName = categoryMap.ContainsKey(i) ? categoryMap[i] : "Other";
+var categoryTotal = Math.Abs(series.Values?[0].TotalNegative ?? 0);
+if (categoryTotal > 0)
+{
+categoryExpenses[categoryName] = categoryTotal;
+totalExpenses += categoryTotal;
+}
+}
+// Calculate number of months for average
+var monthsDiff = ((periodTo.Year - periodFrom.Year) * 12) + periodTo.Month -
+periodFrom.Month;
+var numberOfMonths = Math.Max(1, monthsDiff);
+var monthlyAverage = totalExpenses / numberOfMonths;
+// Build output - sort by amount descending
+var result = new StringBuilder();
+result.AppendLine($"Period: {periodFrom:yyyy-MM-dd} to {periodTo:yyyy-MM-dd}");
+result.AppendLine($"Total Expenses: {totalExpenses:N0} EUR");
+result.AppendLine("
+---
+");
+result.AppendLine("Category Breakdown:");
+foreach (var kvp in categoryExpenses.OrderByDescending(x => x.Value))
+{
+var percentage = (kvp.Value / totalExpenses) * 100;
+result.AppendLine($"{kvp.Key}: {kvp.Value:N0} EUR ({percentage:F1}%)");
+}
+result.AppendLine("
+---
+");
+}
+}
+result.AppendLine($"Monthly Average: {monthlyAverage:N0} EUR");
+result.AppendLine($"Number of Months: {numberOfMonths}");
+return result.ToString();
+
+---
+
+using System.ComponentModel;
+using Meniga.Clients.UserApi;
+using Microsoft.SemanticKernel;
+namespace Meniga.AI.Plugins;
+/// <summary>
+/// Provides savings planning and investment product functions.
+/// </summary>
+public sealed class Savings(UserApiClient userApiClient)
+{
+//[KernelFunction("get
+available
+_
+_
+savings
+_products")]
+//[Description("Gets available savings and investment products filtered by risk level with
+recommendations.
+")]
+//public string GetAvailableSavingsProducts(
+// [Description("Risk level: low, moderate, high")] string riskLevel)
+//{
+// if (riskLevel.ToLower().Contains("moderate"))
+// {
+// return """
+// Available Savings Products (Moderate Risk):
+// ---
+// 1. Balanced Investment Fund "Growth Plus"
+// Expected Return: 4-6% annually
+// Minimum Investment: 1,000 EUR
+// Risk Level: Moderate
+// Details: 60% stocks, 40% bonds mix
+// ---
+// 2. Corporate Bond Portfolio
+// Expected Return: 3.5-5% annually
+// Minimum Investment: 5,000 EUR
+// Risk Level: Moderate-Low
+// Details: Diversified corporate bonds, A-rated
+// ---
+// 3. Equity Index Fund "Europe 100"
+// Expected Return: 5-8% annually
+// Minimum Investment: 500 EUR
+// Risk Level: Moderate
+// Details: Tracks top 100 European companies
+// ---
+// 4. Real Estate Investment Trust (REIT)
+// Expected Return: 4-7% annually
+// Minimum Investment: 2,000 EUR
+// Risk Level: Moderate
+// Details: Commercial property exposure
+// ---
+// 5. Managed Pension Plan "FlexFuture"
+// Expected Return: 4-5.5% annually
+// Minimum Investment: 50 EUR/month
+// Risk Level: Moderate
+// Details: Professionally managed, tax advantages
+// ---
+// Your Current Situation:
+// Available for Investment: 3,000 EUR (current savings)
+// Monthly Surplus: 800 EUR
+// ---
+// Recommended: Start with option #3 (Index Fund) for
+// regular monthly contributions of 100-200 EUR, keeping
+// emergency fund of 2,000 EUR in savings account.
+// """;
+// }
+// return "No products found for the specified risk level.
+";
+//}
+//[KernelFunction("create
+_
+daily_
+savings
+_plan")]
+//[Description("Creates a savings plan based on daily savings amount with practical tips and
+projections.
+")]
+//public string CreateDailySavingsPlan(
+// [Description("Daily savings amount in EUR")] decimal dailySavings)
+//{
+// return """
+// Daily Savings Plan:
+// ---
+// Daily Savings Goal: 2 EUR
+// ---
+// Projections:
+// Weekly: 14 EUR
+// Monthly (30 days): 60 EUR
+// Quarterly (90 days): 180 EUR
+// Yearly (365 days): 730 EUR
+// ---
+// Current Financial Situation:
+// Monthly Income: 5,000 EUR
+// Monthly Expenses: 4,200 EUR
+// Current Monthly Surplus: 800 EUR
+// ---
+// Feasibility Analysis:
+// Required monthly (2 EUR × 30): 60 EUR
+// Your available surplus: 800 EUR
+// Impact on surplus: 7.5%
+// ---
+// Status: ACHIEVABLE ✓
+// ---
+// Practical Tips to Save 2 EUR Daily:
+// • Skip one coffee shop visit → Save 3-4 EUR
+// • Bring lunch from home 1 day/week → Save 10-15 EUR/week
+// • Use public transport instead of taxi once → Save 10+ EUR
+// • Cancel one unused subscription → Save 10-15 EUR/month
+// • Buy generic brands for groceries → Save 20-30 EUR/month
+// ---
+// By consistently saving 2 EUR per day, you'll build
+// an additional emergency fund of 730 EUR per year!
+// """;
+//}
+//[KernelFunction("project
+_
+savings
+_growth")]
+//[Description("Projects how much will be saved by a target date given a monthly savings
+amount.
+")]
+//public string ProjectSavingsGrowth(
+// [Description("Monthly savings amount in EUR")] decimal monthlySavings,
+// [Description("Target date in YYYY-MM-DD format")] string targetDate)
+//{
+// return """
+// Savings Projection:
+// ---
+// Monthly Savings: 30 EUR
+// Start Date: 2025-10-20
+// Target Date: 2025-12-25 (Christmas)
+// ---
+// Duration: 2.2 months (approximately 66 days)
+// Number of Monthly Deposits: 2 full months + 5 days
+// ---
+// Projection:
+// October (partial - 11 days): 11 EUR
+// November: 30 EUR
+// December (until 25th): 25 EUR
+// ---
+// Total Savings by Christmas: 66 EUR
+// ---
+// Current Savings: 3,000 EUR
+// Projected Total by Christmas: 3,066 EUR
+// ---
+// Note: This assumes consistent monthly savings of 30 EUR.
+// If you can save this amount starting today, you'll have
+// an additional 66 EUR by Christmas for gifts or celebrations.
+// """;
+//}
+[KernelFunction("calculate
+_goal
+_
+savings
+_plan")]
+[Description("Calculates the required monthly savings amount to reach a specific financial
+goal by a target date.
+")]
+public async Task<string> CalculateGoalSavingsPlan(
+[Description("The goal description or item to save for")] string goalDescription,
+[Description("Target amount in EUR")] decimal targetAmount,
+[Description("Target date in YYYY-MM-DD format")] string targetDate)
+{
+var now = DateTimeOffset.UtcNow;
+// 1. Parse target date flexibly
+DateTimeOffset goalDate;
+if (targetDate.Length == 4 && int.TryParse(targetDate, out var year))
+{
+// Just year provided: assume end of year
+goalDate = new DateTimeOffset(year, 12, 31, 23, 59, 59, TimeSpan.Zero);
+else if (!DateTimeOffset.TryParse(targetDate, out goalDate))
+return $"Unable to parse target date: {targetDate}. Please use format YYYY-MM-DD or
+just the year (e.g., 2028).
+";
+}
+{
+}
+// Validate target date is in the future
+if (goalDate <= now)
+{
+return "Target date must be in the future. Please provide a later date for your goal.
+";
+}
+// Calculate months remaining
+var monthsRemaining = ((goalDate.Year - now.Year) * 12) + (goalDate.Month -
+now.Month);
+// Add 1 if we're past the day of the month in the target month
+if (goalDate.Day < now.Day)
+{
+monthsRemaining--;
+}
+if (monthsRemaining < 1)
+{
+return "Target date is too soon (less than 1 month away). Please extend your timeline.
+";
+}
+// 2. Get current savings from accounts
+var accountsResponse = await userApiClient.User.Core.V1.Accounts.GetAsync();
+var accounts = accountsResponse?.Data ?? [];
+var savingsAccounts = accounts.Where(a =>
+a.AccountCategory ==
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.AccountCategoryEnum.Savings).ToLis
+t();
+var currentAccounts = accounts.Where(a =>
+a.AccountCategory ==
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.AccountCategoryEnum.Current).ToList
+();
+var currentSavings = savingsAccounts.Sum(a => a.Balance ?? 0);
+var currentBalance = currentAccounts.Sum(a => a.Balance ?? 0);
+// 3. Get monthly surplus from recent transactions
+var periodFrom = now.AddMonths(-6).Date;
+var periodTo = now.Date;
+var transactionRequest = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesRequest
+{
+TransactionFilter = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionFilter
+{
+PeriodFrom = periodFrom,
+PeriodTo = periodTo
+},
+Options = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesOptions
+{
+TimeResolution =
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.AggregationLevelEnum.Month,
+OverTime = true
+}
+};
+var transactionResponse = await
+userApiClient.User.Core.V1.Transactions.Series.PostAsync(transactionRequest);
+double avgMonthlyIncome = 0;
+double avgMonthlyExpenses = 0;
+double monthlySurplus = 0;
+if (transactionResponse?.Data != null && transactionResponse.Data.Count > 0)
+{
+var series = transactionResponse.Data[0];
+var monthlyData = series.Values?.Where(v => v.TotalPositive.HasValue &&
+v.TotalNegative.HasValue).ToList() ?? [];
+if (monthlyData.Any())
+{
+avgMonthlyIncome = monthlyData.Average(v => v.TotalPositive ?? 0);
+avgMonthlyExpenses = monthlyData.Average(v => Math.Abs(v.TotalNegative ?? 0));
+monthlySurplus = avgMonthlyIncome - avgMonthlyExpenses;
+}
+}
+// 4. Calculate required monthly savings
+var amountNeeded = (double)targetAmount - currentSavings;
+if (amountNeeded <= 0)
+{
+return $"Great news! You already have {currentSavings:N0} EUR saved, which exceeds
+your goal of {targetAmount:N0} EUR. Your goal is already achieved!";
+}
+var requiredMonthlySavings = amountNeeded / monthsRemaining;
+// 5. Feasibility analysis
+var gap = requiredMonthlySavings - monthlySurplus;
+var gapPercentage = monthlySurplus > 0 ? (gap / monthlySurplus) * 100 : 100;
+string feasibilityStatus;
+string feasibilityEmoji;
+if (gap <= 0)
+{
+feasibilityStatus = "ACHIEVABLE ✓";
+feasibilityEmoji = "✓";
+}
+{
+else if (gapPercentage <= 20)
+feasibilityStatus = "CHALLENGING but POSSIBLE";
+feasibilityEmoji = "⚠";
+}
+{
+else if (gapPercentage <= 50)
+feasibilityStatus = "DIFFICULT - significant changes needed";
+feasibilityEmoji = "⚠";
+}
+else
+{
+feasibilityStatus = "VERY DIFFICULT - consider adjusting goal";
+feasibilityEmoji = "❌";
+}
+// 6. Build detailed output
+var result = new System.Text.StringBuilder();
+result.AppendLine("Goal Planning Analysis:");
+result.AppendLine("
+---
+");
+result.AppendLine($"Goal: {goalDescription}");
+result.AppendLine($"Target Amount: {targetAmount:N0} EUR");
+result.AppendLine($"Target Date: {goalDate:yyyy-MM-dd}");
+result.AppendLine($"Time Remaining: {monthsRemaining} months");
+result.AppendLine("
+---
+");
+result.AppendLine("Current Financial Situation:");
+result.AppendLine($"Current Savings: {currentSavings:N0} EUR");
+result.AppendLine($"Current Balance: {currentBalance:N0} EUR");
+result.AppendLine($"Amount Still Needed: {amountNeeded:N0} EUR");
+if (monthlySurplus > 0)
+{
+result.AppendLine($"Monthly Income: {avgMonthlyIncome:N0} EUR");
+result.AppendLine($"Monthly Expenses: {avgMonthlyExpenses:N0} EUR");
+result.AppendLine($"Available for Savings: {monthlySurplus:N0} EUR");
+}
+result.AppendLine("
+---
+");
+result.AppendLine($"Required Monthly Savings: {requiredMonthlySavings:N0} EUR");
+result.AppendLine("
+---
+");
+result.AppendLine("Feasibility Analysis:");
+result.AppendLine($"{feasibilityEmoji} {feasibilityStatus}");
+if (gap <= 0)
+{
+var buffer = Math.Abs(gap);
+result.AppendLine($"Your available surplus ({monthlySurplus:N0} EUR) exceeds the
+required amount ({requiredMonthlySavings:N0} EUR).
+");
+result.AppendLine($"Monthly buffer: {buffer:N0} EUR");
+result.AppendLine("
+---
+");
+result.AppendLine("Savings Plan:");
+result.AppendLine($"1. Set aside {requiredMonthlySavings:N0} EUR/month for your
+{goalDescription.ToLower()} goal");
+result.AppendLine($"2. Remaining {buffer:N0} EUR can stay as buffer or go to
+emergency fund");
+result.AppendLine("3. Consider setting up automatic transfer on payday");
+result.AppendLine($"4. You'll reach your goal by: {goalDate:yyyy-MM-dd}");
+}
+{
+else if (gapPercentage <= 20)
+result.AppendLine($"You need {requiredMonthlySavings:N0} EUR/month but currently
+have {monthlySurplus:N0} EUR available.
+");
+result.AppendLine($"Shortfall: {gap:N0} EUR/month ({gapPercentage:F1}%)");
+result.AppendLine("
+---
+");
+result.AppendLine("Recommendations:");
+result.AppendLine($"1. Reduce non-essential expenses by {gap:N0} EUR/month ({(gap /
+avgMonthlyExpenses * 100):F1}%)");
+result.AppendLine($"2. Consider a small side income (~{gap:N0} EUR/month extra)");
+result.AppendLine("3. Review these categories for potential savings:");
+result.AppendLine("
+- Entertainment, Dining Out, Shopping");
+result.AppendLine($"4. Alternative: Extend deadline by {(int)(monthsRemaining *
+(gapPercentage / 100) + 1)} month(s)");
+}
+{
+else
+result.AppendLine($"You need {requiredMonthlySavings:N0} EUR/month but currently
+have {monthlySurplus:N0} EUR available.
+");
+result.AppendLine($"Shortfall: {gap:N0} EUR/month ({gapPercentage:F1}%)");
+result.AppendLine("
+---
+");
+result.AppendLine("Recommendations:");
+result.AppendLine("Consider adjusting your goal:");
+result.AppendLine($"1. Lower target amount to {(monthlySurplus * monthsRemaining +
+currentSavings):N0} EUR (achievable with current surplus)");
+result.AppendLine($"2. Extend deadline to {goalDate.AddMonths((int)(gap /
+monthlySurplus * monthsRemaining)):yyyy-MM-dd}");
+result.AppendLine($"3. Increase income significantly (~{gap:N0} EUR/month extra
+needed)");
+result.AppendLine($"4. Make major lifestyle changes to reduce expenses by {(gap /
+avgMonthlyExpenses * 100):F1}%");
+}
+// Add progress milestones if achievable
+if (gap <= monthlySurplus * 0.20)
+{
+result.AppendLine("
+---
+");
+result.AppendLine("Progress Milestones:");
+var milestones = new[] { 3, 6, 12, 18, 24 };
+foreach (var month in milestones.Where(m => m <= monthsRemaining))
+{
+var savings = currentSavings + (requiredMonthlySavings * month);
+var percentage = (savings / (double)targetAmount) * 100;
+result.AppendLine($"Month {month}: {savings:N0} EUR ({percentage:F1}%)");
+}
+var finalSavings = currentSavings + (requiredMonthlySavings * monthsRemaining);
+result.AppendLine($"Month {monthsRemaining}: {finalSavings:N0} EUR (100%) ✓
+GOAL REACHED");
+}
+return result.ToString();
+}
+[KernelFunction("get
+_
+savings
+_potential
+_
+analysis")]
+[Description("Analyzes income and expenses to determine potential monthly savings with
+different strategies.
+")]
+public async Task<string> GetSavingsPotentialAnalysis()
+{
+var now = DateTimeOffset.UtcNow;
+var periodFrom = now.AddMonths(-6).Date;
+var periodTo = now.Date;
+// Create request to get transaction series over last 6 months
+var request = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesRequest
+{
+TransactionFilter = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionFilter
+{
+PeriodFrom = periodFrom,
+PeriodTo = periodTo
+},
+Options = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesOptions
+{
+TimeResolution =
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.AggregationLevelEnum.Month,
+OverTime = true,
+IncludeTransactions = true // Need for category breakdown
+}
+};
+var response = await userApiClient.User.Core.V1.Transactions.Series.PostAsync(request);
+if (response?.Data == null || response.Data.Count == 0)
+{
+return "No transaction data available to analyze savings potential.
+";
+}
+var series = response.Data[0];
+if (series.Values == null || series.Values.Count == 0)
+{
+return "No transaction data available for the last 6 months.
+";
+}
+// Calculate average monthly income and expenses
+var monthlyData = series.Values.Where(v => v.TotalPositive.HasValue &&
+v.TotalNegative.HasValue).ToList();
+if (monthlyData.Count == 0)
+{
+return "Insufficient transaction data to analyze savings potential.
+";
+}
+var avgMonthlyIncome = monthlyData.Average(v => v.TotalPositive ?? 0);
+var avgMonthlyExpenses = monthlyData.Average(v => Math.Abs(v.TotalNegative ?? 0));
+var avgMonthlySurplus = avgMonthlyIncome - avgMonthlyExpenses;
+// Estimate essential vs non-essential split (typical household: 60-70% essential, 30-40%
+non-essential)
+// This is a conservative estimate based on financial planning best practices
+var estimatedEssentialExpenses = avgMonthlyExpenses * 0.70; // 70% essential
+var estimatedNonEssentialExpenses = avgMonthlyExpenses * 0.30; // 30% non-essential
+// Calculate savings scenarios
+var conservativeSavings = Math.Max(0, avgMonthlySurplus * 0.60); // 60% of surplus
+var moderateSavings = Math.Max(0, avgMonthlySurplus * 0.80); // 80% of surplus
+var aggressiveSavings = Math.Max(0, avgMonthlySurplus +
+(estimatedNonEssentialExpenses * 0.30)); // Reduce non-essential by 30%
+// Calculate savings rate
+var savingsRate = avgMonthlyIncome > 0 ? (avgMonthlySurplus / avgMonthlyIncome) *
+100 : 0;
+// Build output
+var result = new System.Text.StringBuilder();
+result.AppendLine("Financial Overview (Last 6 months average):");
+result.AppendLine("
+---
+");
+result.AppendLine($"Monthly Income: {avgMonthlyIncome:N0} EUR");
+result.AppendLine("
+---
+");
+result.AppendLine("Monthly Expenses:");
+result.AppendLine($"Essential Expenses (estimated ~70%):
+{estimatedEssentialExpenses:N0} EUR");
+result.AppendLine($"Non-Essential Expenses (estimated ~30%):
+{estimatedNonEssentialExpenses:N0} EUR");
+result.AppendLine($"Total Monthly Expenses: {avgMonthlyExpenses:N0} EUR");
+result.AppendLine("
+---
+");
+result.AppendLine($"Current Monthly Surplus: {avgMonthlySurplus:N0} EUR");
+result.AppendLine($"Current Savings Rate: {savingsRate:F1}% (Recommended: 20%+)");
+result.AppendLine("
+---
+");
+result.AppendLine("Savings Potential Analysis:");
+result.AppendLine($"Conservative (save 60% of surplus): {conservativeSavings:N0}
+EUR");
+result.AppendLine($"Moderate (save 80% of surplus): {moderateSavings:N0} EUR ✓
+RECOMMENDED");
+result.AppendLine($"Aggressive (reduce non-essential by 30% + full surplus):
+{aggressiveSavings:N0} EUR");
+result.AppendLine("
+---
+");
+// Add recommendations based on analysis
+if (avgMonthlySurplus <= 0)
+{
+result.AppendLine("⚠ Warning: Your expenses exceed your income.
+");
+result.AppendLine("Focus on reducing expenses before setting savings goals.
+");
+}
+{
+else if (savingsRate < 10)
+result.AppendLine("Recommendation: Your savings rate is below 10%.
+");
+result.AppendLine($"Start with conservative goal: {conservativeSavings:N0}
+EUR/month");
+result.AppendLine($"Consider reducing non-essential spending
+({estimatedNonEssentialExpenses:N0} EUR) by 20%");
+result.AppendLine($"
+→ Potential extra savings: {estimatedNonEssentialExpenses *
+0.20:N0} EUR/month");
+}
+{
+else if (savingsRate < 20)
+result.AppendLine("Recommendation: Good progress! Aim for 20% savings rate.
+");
+result.AppendLine($"Target moderate savings: {moderateSavings:N0} EUR/month");
+result.AppendLine("Review discretionary spending for optimization opportunities.
+");
+}
+{
+else
+result.AppendLine("Excellent! Your savings rate exceeds 20%.
+");
+result.AppendLine($"You can safely save {moderateSavings:N0} EUR/month");
+result.AppendLine("Consider investing surplus in long-term savings products.
+");
+}
+return result.ToString();
+}
+}
+
+---
+
+using System.ComponentModel;
+using System.Text;
+using Meniga.AI.Plugins.Configuration;
+using Meniga.Clients.UserApi;
+using Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models;
+using Microsoft.Extensions.Options;
+using Microsoft.SemanticKernel;
+namespace Meniga.AI.Plugins;
+/// <summary>
+/// Provides income and salary history functions.
+/// </summary>
+public sealed class Income(UserApiClient userApiClient, IOptions<PluginConfiguration>
+configuration)
+{
+[KernelFunction("get
+income
+transactions
+_
+_
+_
+list")]
+[Description("Gets the list of all income transactions of the user grouped by months.
+")]
+public async Task<string> GetIncomeTransactionsList(
+[Description("How many months in the past the report should reach out?")] int months)
+{
+var now = DateTimeOffset.UtcNow;
+var periodFrom = now.AddMonths(-months).Date;
+var periodTo = now.Date;
+// Determine if we use category ID or amount-based filtering
+var useCategoryFilter = configuration.Value.SalaryCategoryId.HasValue;
+var disclaimer = useCategoryFilter
+? ""
+: "\n⚠ Note: Results are based on positive amount filtering and might include non-salary
+income. Category-based filtering is not configured.\n";
+// Create transaction filter
+var transactionFilter = new TransactionFilter
+{
+PeriodFrom = periodFrom,
+PeriodTo = periodTo
+};
+// Apply category filter if available, otherwise use amount-based filtering
+if (useCategoryFilter && configuration.Value.SalaryCategoryId.HasValue)
+{
+transactionFilter.CategoryIds = [configuration.Value.SalaryCategoryId.Value];
+}
+else
+{
+}
+{
+transactionFilter.AmountFrom = 0.01; // Filter for positive amounts (income)
+// Create request to get income transactions over time
+var request = new TransactionSeriesRequest
+TransactionFilter = transactionFilter,
+Options = new TransactionSeriesOptions
+{
+TimeResolution = AggregationLevelEnum.Month,
+OverTime = true,
+IncludeTransactions = true
+}
+};
+var response = await userApiClient.User.Core.V1.Transactions.Series.PostAsync(request);
+if (response?.Data == null || response.Data.Count == 0)
+{
+return $"{disclaimer}No income transactions found for the specified period.
+";
+}
+var result = new StringBuilder();
+var series = response.Data[0];
+if (series.Transactions == null || series.Transactions.Count == 0)
+{
+return $"{disclaimer}No income transactions found for the specified period.
+";
+}
+// Add disclaimer if present
+if (!string.IsNullOrEmpty(disclaimer))
+{
+result.AppendLine(disclaimer.Trim());
+}
+// Group transactions by month and format output
+var transactionsByMonth = series.Transactions
+.Where(t => t.Date.HasValue && t.Amount.HasValue && t.Amount.Value > 0)
+.OrderByDescending(t => t.Date!.Value)
+.GroupBy(t => new { t.Date!.Value.Year, t.Date.Value.Month })
+.OrderByDescending(g => g.Key.Year)
+.ThenByDescending(g => g.Key.Month);
+bool first = true;
+foreach (var monthGroup in transactionsByMonth)
+{
+if (!first)
+{
+result.AppendLine("
+---
+");
+}
+first = false;
+result.AppendLine($"{monthGroup.Key.Year:D4}-{monthGroup.Key.Month:D2}");
+foreach (var transaction in monthGroup.OrderByDescending(t => t.Date))
+{
+var text = transaction.Text ?? "Income";
+var amount = transaction.Amount!.Value;
+var currency = transaction.Currency ?? "EUR";
+result.AppendLine($"{text} {amount:F0} {currency}");
+}
+}
+return result.ToString().TrimEnd();
+}
+}
+
+
+----
+
+using System.ComponentModel;
+using System.Text;
+using Meniga.Clients.UserApi;
+using Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models;
+using Microsoft.SemanticKernel;
+namespace Meniga.AI.Plugins;
+/// <summary>
+/// Provides comprehensive financial data analysis functions.
+/// </summary>
+public sealed class FinancialData(UserApiClient userApiClient)
+{
+[KernelFunction("get
+_
+complete
+financial
+_
+_
+analysis")]
+[Description("Gets a comprehensive financial analysis including income, expenses, savings,
+and health indicators.
+")]
+public async Task<string> GetCompleteFinancialAnalysis()
+{
+var now = DateTimeOffset.UtcNow;
+var periodFrom = now.AddMonths(-6).Date;
+var periodTo = now.Date;
+// 1. Get transaction series for last 6 months with category details
+var transactionRequest = new TransactionSeriesRequest
+{
+TransactionFilter = new TransactionFilter
+{
+PeriodFrom = periodFrom,
+PeriodTo = periodTo
+},
+{
+Options = new TransactionSeriesOptions
+TimeResolution = AggregationLevelEnum.Month,
+OverTime = true,
+IncludeTransactions = true // Need for category breakdown
+}
+};
+var transactionResponse = await
+userApiClient.User.Core.V1.Transactions.Series.PostAsync(transactionRequest);
+if (transactionResponse?.Data == null || transactionResponse.Data.Count == 0)
+{
+return "No financial data available to analyze.
+";
+}
+var series = transactionResponse.Data[0];
+if (series.Values == null || series.Values.Count == 0)
+{
+return "No transaction data available for the last 6 months.
+";
+}
+// 2. Calculate average monthly income and expenses
+var monthlyData = series.Values.Where(v => v.TotalPositive.HasValue &&
+v.TotalNegative.HasValue).ToList();
+if (monthlyData.Count == 0)
+{
+return "Insufficient transaction data to analyze.
+";
+}
+var avgMonthlyIncome = monthlyData.Average(v => v.TotalPositive ?? 0);
+var avgMonthlyExpenses = monthlyData.Average(v => Math.Abs(v.TotalNegative ?? 0));
+var avgMonthlySurplus = avgMonthlyIncome - avgMonthlyExpenses;
+var annualIncome = avgMonthlyIncome * 12;
+// 3. Get category breakdown from transactions
+var allTransactions = series.Transactions ?? [];
+var expenseTransactions = allTransactions
+.Where(t => t.Amount.HasValue && t.Amount.Value < 0)
+.ToList();
+// Group by category ID and aggregate
+var categoriesResponse = await userApiClient.User.Core.V1.Categories.GetAsync();
+var allCategories = categoriesResponse?.Data ?? [];
+// Create category ID to name mapping
+var categoryMap = new Dictionary<int, string>();
+foreach (var cat in allCategories)
+{
+if (cat.Id.HasValue)
+{
+categoryMap[cat.Id.Value] = cat.Name ?? "Uncategorized";
+}
+// Add children
+if (cat.Children != null)
+{
+foreach (var child in cat.Children)
+{
+if (child.Id.HasValue)
+{
+categoryMap[child.Id.Value] = child.Name ?? "Uncategorized";
+}
+}
+}
+}
+// Group expenses by category
+var expensesByCategory = expenseTransactions
+.Where(t => t.CategoryId.HasValue)
+.GroupBy(t => t.CategoryId!.Value)
+.Select(g => new
+{
+CategoryId = g.Key,
+CategoryName = categoryMap.ContainsKey(g.Key) ? categoryMap[g.Key] : "Other"
+,
+MonthlyAverage = Math.Abs(g.Sum(t => t.Amount ?? 0)) /
+Math.Max(monthlyData.Count, 1),
+Total = Math.Abs(g.Sum(t => t.Amount ?? 0))
+})
+.ToList();
+.OrderByDescending(c => c.MonthlyAverage)
+// 4. Get current savings from accounts
+var accountsResponse = await userApiClient.User.Core.V1.Accounts.GetAsync();
+var accounts = accountsResponse?.Data ?? [];
+var savingsAccounts = accounts.Where(a =>
+a.AccountCategory == AccountCategoryEnum.Savings).ToList();
+var currentAccounts = accounts.Where(a =>
+a.AccountCategory == AccountCategoryEnum.Current).ToList();
+var currentSavings = savingsAccounts.Sum(a => a.Balance ?? 0);
+var currentBalance = currentAccounts.Sum(a => a.Balance ?? 0);
+var totalLiquidAssets = currentSavings + currentBalance;
+// 5. Calculate financial health indicators
+var savingsRate = avgMonthlyIncome > 0 ? (avgMonthlySurplus / avgMonthlyIncome) *
+100 : 0;
+var emergencyFundMonths = avgMonthlyExpenses > 0 ? totalLiquidAssets /
+avgMonthlyExpenses : 0;
+// Identify housing category
+var housingCategories = expensesByCategory
+.Where(c => c.CategoryName.Contains("Housing"
+,
+StringComparison.OrdinalIgnoreCase) ||
+c.CategoryName.Contains("Rent"
+, StringComparison.OrdinalIgnoreCase) ||
+c.CategoryName.Contains("Mortgage"
+, StringComparison.OrdinalIgnoreCase))
+.ToList();
+var housingExpense = housingCategories.Sum(c => c.MonthlyAverage);
+var housingCostRatio = avgMonthlyIncome > 0 ? (housingExpense / avgMonthlyIncome) *
+100 : 0;
+// 6. Calculate spending trends (compare last 3 months vs previous 3 months)
+var recentMonths = monthlyData.TakeLast(3).ToList();
+var previousMonths = monthlyData.Count >= 6 ? monthlyData.Skip(0).Take(3).ToList() : [];
+var recentAvgExpenses = recentMonths.Any() ? recentMonths.Average(v =>
+Math.Abs(v.TotalNegative ?? 0)) : 0;
+var previousAvgExpenses = previousMonths.Any() ? previousMonths.Average(v =>
+Math.Abs(v.TotalNegative ?? 0)) : 0;
+var expenseTrend = previousAvgExpenses > 0 ? ((recentAvgExpenses -
+previousAvgExpenses) / previousAvgExpenses) * 100 : 0;
+// Categorize essential vs non-essential
+var essentialKeywords = new[] { "housing"
+,
+"transport"
+,
+"insurance"
+"healthcare"
+,
+,
+"medical" };
+"rent"
+,
+"mortgage"
+,
+"utilities"
+,
+"groceries"
+,
+"food"
+,
+var essentialExpenses = expensesByCategory
+.Where(c => essentialKeywords.Any(k => c.CategoryName.Contains(k,
+StringComparison.OrdinalIgnoreCase)))
+.Sum(c => c.MonthlyAverage);
+var nonEssentialExpenses = avgMonthlyExpenses - essentialExpenses;
+// 7. Build comprehensive output
+var result = new StringBuilder();
+result.AppendLine("Comprehensive Financial Overview:");
+result.AppendLine("
+---
+");
+result.AppendLine("Income:");
+result.AppendLine($"Monthly Salary: {avgMonthlyIncome:N0} EUR");
+result.AppendLine($"Annual: {annualIncome:N0} EUR");
+result.AppendLine("
+---
+");
+result.AppendLine("Expenses (Monthly Average):");
+result.AppendLine($"Total: {avgMonthlyExpenses:N0} EUR");
+result.AppendLine($"Essential: {essentialExpenses:N0} EUR ({(essentialExpenses /
+avgMonthlyExpenses * 100):F0}%)");
+result.AppendLine($"Non-Essential: {nonEssentialExpenses:N0} EUR
+({(nonEssentialExpenses / avgMonthlyExpenses * 100):F0}%)");
+result.AppendLine("
+---
+");
+result.AppendLine("Savings:");
+result.AppendLine($"Current Savings: {currentSavings:N0} EUR");
+result.AppendLine($"Current Balance: {currentBalance:N0} EUR");
+result.AppendLine($"Monthly Savings Rate: {avgMonthlySurplus:N0} EUR
+({savingsRate:F1}%)");
+result.AppendLine("
+---
+");
+result.AppendLine("Category Breakdown:");
+// Top 8 expense categories
+foreach (var category in expensesByCategory.Take(8))
+{
+var percentage = avgMonthlyExpenses > 0 ? (category.MonthlyAverage /
+avgMonthlyExpenses) * 100 : 0;
+result.AppendLine($"{category.CategoryName}: {category.MonthlyAverage:N0} EUR
+({percentage:F1}%)");
+}
+result.AppendLine("
+---
+");
+result.AppendLine("Financial Health Indicators:");
+result.AppendLine($"Savings Rate: {savingsRate:F1}% (Recommended: 20%+)");
+result.AppendLine($"Emergency Fund: {emergencyFundMonths:F1} months
+(Recommended: 3-6 months)");
+if (housingExpense > 0)
+{
+result.AppendLine($"Housing Cost Ratio: {housingCostRatio:F1}% ({(housingCostRatio
+<= 30 ? "Good - within 30% guideline" : "High - consider reducing")})");
+}
+var creditAccounts = accounts.Where(a => a.AccountCategory ==
+AccountCategoryEnum.Credit).ToList();
+var totalDebt = creditAccounts.Sum(a => Math.Abs(a.Balance ?? 0));
+result.AppendLine($"Debt: {(totalDebt > 0 ? $"{totalDebt:N0} EUR" : "None reported")}");
+result.AppendLine("
+---
+");
+result.AppendLine("Spending Trends:");
+if (Math.Abs(expenseTrend) > 5)
+{
+var trendDirection = expenseTrend > 0 ? "increased" : "decreased";
+result.AppendLine($"Overall spending {trendDirection} {Math.Abs(expenseTrend):F1}%
+in recent months");
+}
+{
+else
+result.AppendLine("Spending relatively stable");
+}
+// Identify top growing categories if available
+var topCategory = expensesByCategory.FirstOrDefault();
+if (topCategory != null)
+{
+result.AppendLine($"Highest expense: {topCategory.CategoryName}
+({topCategory.MonthlyAverage:N0} EUR/month)");
+}
+// Check if emergency fund is adequate
+if (emergencyFundMonths < 3)
+{
+result.AppendLine("⚠ Emergency fund below recommended 3 months");
+}
+result.AppendLine("
+---
+");
+// Get upcoming scheduled payments
+var scheduledPaymentsResponse = await
+userApiClient.User.Core.V1.Futurepayments.Scheduledpayments.GetAsync();
+var scheduledPayments = scheduledPaymentsResponse?.Data ?? [];
+var upcomingBills = scheduledPayments
+.Where(p => p.IsReceivable == false && p.BookingDate == null && p.DueDate.HasValue
+&& p.DueDate.Value >= now)
+.Sum(p => Math.Abs(p.AmountInCurrency ?? 0));
+var upcomingIncome = scheduledPayments
+.Where(p => p.IsReceivable == true && p.BookingDate == null && p.DueDate.HasValue
+&& p.DueDate.Value >= now)
+.Sum(p => p.AmountInCurrency ?? 0);
+var billsCoverage = (currentBalance + upcomingIncome) >= upcomingBills;
+result.AppendLine($"Upcoming Bills Coverage: {(billsCoverage ? "Adequate" : "⚠
+Insufficient - monitor closely")}");
+return result.ToString();
+}
+//[KernelFunction("get
+financial
+_
+_
+summary")]
+//[Description("Gets the comprehensive financial summary including income, expenses, and
+category breakdown.
+")]
+//public Task<string> GetFinancialSummary()
+//{
+// return Task.FromResult("""
+// Monthly Income: 5000 EUR
+// Monthly Expenses: 4200 EUR
+// Current Savings: 3000 EUR
+// ---
+// Top Expense Categories:
+// Housing: 1500 EUR
+// Food & Dining: 800 EUR
+// Transportation: 400 EUR
+// Entertainment: 600 EUR
+// Shopping: 500 EUR
+// Utilities: 400 EUR
+// """);
+//}
+}
+
+---
+
+using System.ComponentModel;
+using Meniga.AI.Plugins.Configuration;
+using Meniga.Clients.UserApi;
+using Microsoft.Extensions.Options;
+using Microsoft.SemanticKernel;
+namespace Meniga.AI.Plugins;
+/// <summary>
+/// Provides expense trend analysis and fee tracking functions.
+/// </summary>
+public sealed class ExpenseTrend(UserApiClient userApiClient, IOptions<PluginConfiguration>
+configuration)
+{
+[KernelFunction("get
+_
+expenses
+trend
+_
+_
+by_period")]
+[Description("Gets expense trends for a specific category grouped by time period (month,
+quarter, or year).
+")]
+public async Task<string> GetExpensesTrendByPeriod(
+[Description("Category to filter by")] string category,
+[Description("Period type: byMonth, byQuarter, byYear")] string periodType)
+{
+// Determine time periods based on periodType
+var now = DateTimeOffset.UtcNow;
+var currentQuarterStart = new DateTimeOffset(now.Year, ((now.Month - 1) / 3) * 3 + 1, 1, 0,
+0, 0, TimeSpan.Zero);
+var previousQuarterStart = currentQuarterStart.AddMonths(-3);
+var previousQuarterEnd = currentQuarterStart.AddDays(-1);
+// Try to find matching categories by name
+var categoriesResponse = await userApiClient.User.Core.V1.Categories.GetAsync();
+var allCategories = categoriesResponse?.Data ?? [];
+// Search for categories matching the requested category name
+var matchingCategories = allCategories
+.Where(c => c.Name != null && c.Name.Contains(category,
+StringComparison.OrdinalIgnoreCase))
+.ToList();
+// Also check children categories
+foreach (var cat in allCategories.Where(c => c.Children != null))
+{
+var matchingChildren = cat.Children!
+.Where(c => c.Name != null && c.Name.Contains(category,
+StringComparison.OrdinalIgnoreCase))
+.ToList();
+matchingCategories.AddRange(matchingChildren);
+}
+var categoryIds = matchingCategories.Select(c => c.Id).Where(id => id.HasValue).Select(id
+=> id!.Value).ToList();
+var useCategoryFilter = categoryIds.Any();
+var disclaimer = useCategoryFilter
+? ""
+: $"\n⚠ Note: No categories found matching '{category}'
+. Results are based on text
+search and might not be fully accurate.\n";
+// Create requests for current and previous quarters
+var currentQuarterRequest = CreateTransactionSeriesRequest(currentQuarterStart, now,
+categoryIds, category, useCategoryFilter);
+var previousQuarterRequest = CreateTransactionSeriesRequest(previousQuarterStart,
+previousQuarterEnd, categoryIds, category, useCategoryFilter);
+// Execute both requests
+var currentQuarterResponse = await
+userApiClient.User.Core.V1.Transactions.Series.PostAsync(currentQuarterRequest);
+var previousQuarterResponse = await
+userApiClient.User.Core.V1.Transactions.Series.PostAsync(previousQuarterRequest);
+if (currentQuarterResponse?.Data == null || currentQuarterResponse.Data.Count == 0)
+{
+return $"{disclaimer}No expense data found for '{category}' in the specified period.
+";
+}
+var currentQuarterData = currentQuarterResponse.Data[0].Values?[0];
+var previousQuarterData = previousQuarterResponse?.Data?[0]?.Values?[0];
+var currentTotal = Math.Abs(currentQuarterData?.TotalNegative ?? 0);
+var previousTotal = Math.Abs(previousQuarterData?.TotalNegative ?? 0);
+var change = currentTotal - previousTotal;
+var changePercent = previousTotal > 0 ? (change / previousTotal) * 100 : 0;
+// Build output
+var output = new System.Text.StringBuilder();
+output.AppendLine(disclaimer);
+output.AppendLine($"Category: {category}");
+output.AppendLine("
+---
+");
+output.AppendLine($"Current Quarter (Q{(now.Month - 1) / 3 + 1} {now.Year}):
+{currentTotal:N0} EUR");
+output.AppendLine($"Previous Quarter (Q{(previousQuarterStart.Month - 1) / 3 + 1}
+{previousQuarterStart.Year}): {previousTotal:N0} EUR");
+var changeSign = change >= 0 ? "+" : "";
+var changeVerb = change >= 0 ? "increased" : "decreased";
+output.AppendLine($"Change: {changeSign}{change:N0} EUR
+({changeSign}{changePercent:F1}%)");
+output.AppendLine($"
+---
+");
+output.AppendLine($"Your {category.ToLower()} expenses have {changeVerb} by
+{Math.Abs(changePercent):F1}% this quarter.
+");
+return output.ToString();
+}
+private Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesRequest
+CreateTransactionSeriesRequest(
+DateTimeOffset periodFrom,
+DateTimeOffset periodTo,
+List<int> categoryIds,
+string categorySearchText,
+bool useCategoryFilter)
+{
+var transactionFilter = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionFilter
+{
+PeriodFrom = periodFrom,
+PeriodTo = periodTo
+};
+{
+}
+else
+{
+if (useCategoryFilter && categoryIds.Any())
+transactionFilter.CategoryIds = categoryIds.Cast<int?>().ToList();
+transactionFilter.SearchText = categorySearchText;
+transactionFilter.SearchTextFields = "text,originalText,category";
+}
+return new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesRequest
+{
+TransactionFilter = transactionFilter,
+Options = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesOptions
+{
+OverTime = false
+},
+[
+SeriesSelectors =
+new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesSelector
+{
+Filter = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionFilter()
+}
+]
+};
+}
+[KernelFunction("get
+_
+expenses
+_
+trend")]
+[Description("Gets expense trends for a specific category with month-over-month
+comparison.
+")]
+public async Task<string> GetExpensesTrend(
+[Description("Category to filter by")] string category)
+{
+var now = DateTimeOffset.UtcNow;
+var currentMonthStart = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0,
+TimeSpan.Zero);
+var previousMonthStart = currentMonthStart.AddMonths(-1);
+var previousMonthEnd = currentMonthStart.AddDays(-1);
+// Try to use HousingCategoryId if category is housing-related and configured
+var useHousingConfig = (category.ToLower().Contains("hous") ||
+category.ToLower().Contains("rent"))
+&& configuration.Value.HousingCategoryId.HasValue;
+List<int?> categoryIds = [];
+if (useHousingConfig)
+{
+categoryIds.Add(configuration.Value.HousingCategoryId!.Value);
+}
+{
+else
+// Search for matching categories by name
+var categoriesResponse = await userApiClient.User.Core.V1.Categories.GetAsync();
+var allCategories = categoriesResponse?.Data ?? [];
+var matchingCategories = allCategories
+.Where(c => c.Name != null && c.Name.Contains(category,
+StringComparison.OrdinalIgnoreCase))
+.ToList();
+// Also check child categories
+foreach (var cat in allCategories.Where(c => c.Children != null))
+{
+var matchingChildren = cat.Children!
+.Where(c => c.Name != null && c.Name.Contains(category,
+StringComparison.OrdinalIgnoreCase))
+.ToList();
+matchingCategories.AddRange(matchingChildren);
+}
+categoryIds = matchingCategories
+.Select(c => c.Id)
+.Where(id => id.HasValue)
+.Select(id => (int?)id!.Value)
+.Distinct()
+.ToList();
+}
+{
+}
+{
+if (categoryIds.Count == 0)
+return $"No categories found matching '{category}'
+.
+";
+// Create requests for current and previous months
+var currentMonthRequest = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesRequest
+TransactionFilter = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionFilter
+{
+PeriodFrom = currentMonthStart,
+PeriodTo = now,
+CategoryIds = categoryIds
+},
+Options = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesOptions
+{
+OverTime = false
+}
+};
+var previousMonthRequest = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesRequest
+{
+TransactionFilter = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionFilter
+{
+PeriodFrom = previousMonthStart,
+PeriodTo = previousMonthEnd,
+CategoryIds = categoryIds
+},
+Options = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesOptions
+{
+OverTime = false
+}
+};
+// Execute both requests
+var currentMonthResponse = await
+userApiClient.User.Core.V1.Transactions.Series.PostAsync(currentMonthRequest);
+var previousMonthResponse = await
+userApiClient.User.Core.V1.Transactions.Series.PostAsync(previousMonthRequest);
+if (currentMonthResponse?.Data == null || currentMonthResponse.Data.Count == 0)
+{
+return $"No expense data found for '{category}' in the current month.
+";
+}
+// Extract totals
+var currentTotal = Math.Abs(currentMonthResponse.Data[0].Values?[0].TotalNegative ??
+0);
+var previousTotal =
+Math.Abs(previousMonthResponse?.Data?[0]?.Values?[0].TotalNegative ?? 0);
+// Calculate change
+var change = currentTotal - previousTotal;
+var changePercent = previousTotal > 0 ? (change / previousTotal) * 100 : 0;
+// Build output
+var output = new System.Text.StringBuilder();
+output.AppendLine($"Category: {category}");
+output.AppendLine("
+---
+");
+output.AppendLine($"Current Month ({now:MMMM yyyy}): {currentTotal:N0} EUR");
+output.AppendLine($"Previous Month ({previousMonthStart:MMMM yyyy}):
+{previousTotal:N0} EUR");
+var changeSign = change >= 0 ? "+" : "";
+var changeVerb = change >= 0 ? "increased" : "decreased";
+output.AppendLine($"Change: {changeSign}{change:N0} EUR
+({changeSign}{changePercent:F1}%)");
+output.AppendLine("
+---
+");
+output.AppendLine($"Your {category.ToLower()} expenses have {changeVerb} by
+{Math.Abs(changePercent):F1}% this month.
+");
+return output.ToString();
+}
+[KernelFunction("get
+bank
+fees
+_
+_
+_
+by_period")]
+[Description("Gets bank fees for a specified time period.
+")]
+public async Task<string> GetBankFeesByPeriod(
+[Description("Start date in YYYY-MM-DD format")] string startDate,
+[Description("End date in YYYY-MM-DD format")] string endDate)
+{
+// Parse dates
+if (!DateTimeOffset.TryParse(startDate, out var periodFrom))
+{
+periodFrom = new DateTimeOffset(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1,
+0, 0, 0, TimeSpan.Zero);
+}
+if (!DateTimeOffset.TryParse(endDate, out var periodTo))
+{
+periodTo = DateTimeOffset.UtcNow;
+}
+// Determine if we use category ID or text search
+var useCategoryFilter = configuration.Value.BankFeesCategoryId.HasValue;
+var disclaimer = useCategoryFilter
+? ""
+: "\n⚠ Note: Results are based on text search for 'fee' and might not be fully accurate.
+Category-based filtering is not configured.\n";
+// Create transaction series request
+var transactionFilter = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionFilter
+{
+PeriodFrom = periodFrom,
+PeriodTo = periodTo
+};
+// Apply category filter if available, otherwise use text search
+if (useCategoryFilter && configuration.Value.BankFeesCategoryId.HasValue)
+{
+}
+else
+{
+transactionFilter.CategoryIds = [configuration.Value.BankFeesCategoryId.Value];
+transactionFilter.SearchText = "fee";
+transactionFilter.SearchTextFields = "text,originalText,category";
+}
+var request = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesRequest
+{
+TransactionFilter = transactionFilter,
+Options = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesOptions
+{
+OverTime = false, // Get total for the period, not time-series
+IncludeTransactions = true // Get individual transaction details
+},
+[
+SeriesSelectors =
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesSelector
+new
+{
+}
+Filter = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionFilter()
+]
+};
+var response = await userApiClient.User.Core.V1.Transactions.Series.PostAsync(request);
+if (response?.Data == null || response.Data.Count == 0)
+{
+return $"{disclaimer}No bank fees found for the specified period.
+";
+}
+var series = response.Data[0];
+var totalFees = Math.Abs(series.Values?[0].TotalNegative ?? 0);
+var transactions = series.Transactions ?? [];
+// Build the output
+var output = new System.Text.StringBuilder();
+output.AppendLine(disclaimer);
+output.AppendLine($"Category: Bank Fees");
+output.AppendLine($"Period: {periodFrom:yyyy-MM-dd} to {periodTo:yyyy-MM-dd}");
+output.AppendLine("
+---
+");
+// List individual transactions
+foreach (var transaction in transactions.OrderByDescending(t => t.Date))
+{
+var amount = Math.Abs(transaction.Amount ?? 0);
+output.AppendLine($"{transaction.Date:yyyy-MM-dd}");
+output.AppendLine($"{amount:F2} {transaction.Currency ?? "EUR"}");
+output.AppendLine($"{transaction.Text}");
+output.AppendLine("
+---
+");
+}
+output.AppendLine($"Total: {totalFees:F2} EUR");
+return output.ToString();
+}
+}
+
+
+---
+
+using System.ComponentModel;
+using System.Text;
+using Meniga.AI.Plugins.Configuration;
+using Meniga.Clients.UserApi;
+using Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models;
+using Microsoft.Extensions.Options;
+using Microsoft.SemanticKernel;
+namespace Meniga.AI.Plugins;
+/// <summary>
+/// Provides budget planning and financial calculation functions.
+/// </summary>
+public sealed class Budget(UserApiClient userApiClient, IOptions<PluginConfiguration>
+configuration)
+{
+[KernelFunction("calculate
+_
+housing_
+budget")]
+[Description("Calculates recommended housing budget based on income percentage with
+current situation analysis.
+")]
+public async Task<string> CalculateHousingBudget(
+[Description("Target percentage of income for housing")] decimal targetPercentage)
+{
+var now = DateTimeOffset.UtcNow;
+var threeMonthsAgo = now.AddMonths(-3);
+// Get average monthly income from last 3 months
+var incomeFilter = new TransactionFilter
+{
+PeriodFrom = threeMonthsAgo,
+PeriodTo = now
+};
+// Apply salary category filter if configured
+if (configuration.Value.SalaryCategoryId.HasValue)
+{
+incomeFilter.CategoryIds = [configuration.Value.SalaryCategoryId.Value];
+}
+{
+else
+incomeFilter.AmountFrom = 0.01; // Fallback: filter for positive amounts
+}
+var incomeRequest = new TransactionSeriesRequest
+{
+TransactionFilter = incomeFilter,
+Options = new TransactionSeriesOptions
+{
+TimeResolution = AggregationLevelEnum.Month,
+OverTime = true
+}
+};
+var incomeResponse = await
+userApiClient.User.Core.V1.Transactions.Series.PostAsync(incomeRequest);
+// Calculate average monthly income
+double monthlyIncome = 0;
+if (incomeResponse?.Data != null && incomeResponse.Data.Count > 0 &&
+incomeResponse.Data[0].Values != null)
+{
+var incomeValues = incomeResponse.Data[0].Values.Where(v =>
+v.TotalPositive.HasValue).ToList();
+if (incomeValues.Count > 0)
+{
+monthlyIncome = incomeValues.Average(v => v.TotalPositive!.Value);
+}
+}
+if (monthlyIncome == 0)
+{
+return "Unable to calculate housing budget. No income data found for the last 3
+months.
+";
+}
+// Calculate target housing budget
+var targetBudget = monthlyIncome * ((double)targetPercentage / 100);
+var annualIncome = monthlyIncome * 12;
+var annualBudget = targetBudget * 12;
+var result = new StringBuilder();
+result.AppendLine("Housing Budget Planning:");
+result.AppendLine("
+---
+");
+result.AppendLine("Your Income:");
+result.AppendLine($"Average Monthly Salary: {monthlyIncome:N0} EUR (last 3 months)");
+result.AppendLine($"Annual: {annualIncome:N0} EUR");
+result.AppendLine("
+---
+");
+result.AppendLine($"Target Housing Budget ({targetPercentage}% of income):");
+result.AppendLine($"Monthly: {targetBudget:N0} EUR");
+result.AppendLine($"Annual: {annualBudget:N0} EUR");
+// Optionally get current housing expenses if category is configured
+if (configuration.Value.HousingCategoryId.HasValue)
+{
+var housingFilter = new TransactionFilter
+{
+PeriodFrom = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, TimeSpan.Zero),
+PeriodTo = now,
+CategoryIds = [configuration.Value.HousingCategoryId.Value]
+};
+{
+var housingRequest = new TransactionSeriesRequest
+TransactionFilter = housingFilter,
+Options = new TransactionSeriesOptions
+{
+OverTime = false,
+IncludeTransactions = true
+}
+};
+var housingResponse = await
+userApiClient.User.Core.V1.Transactions.Series.PostAsync(housingRequest);
+0);
+if (housingResponse?.Data != null && housingResponse.Data.Count > 0)
+{
+var currentTotal = Math.Abs(housingResponse.Data[0].Values?[0].TotalNegative ??
+var currentPercentage = (currentTotal / monthlyIncome) * 100;
+var difference = currentTotal - targetBudget;
+result.AppendLine("
+---
+");
+result.AppendLine("Current Housing Expenses (this month):");
+// List individual transactions if available
+var transactions = housingResponse.Data[0].Transactions ?? [];
+if (transactions.Count > 0)
+{
+foreach (var transaction in transactions.OrderByDescending(t => t.Amount))
+{
+result.AppendLine($"• {transaction.Text}: {Math.Abs(transaction.Amount ??
+0):N2} EUR");
+}
+}
+result.AppendLine($"Total Current: {currentTotal:N0} EUR ({currentPercentage:F1}%
+of income)");
+result.AppendLine("
+---
+");
+if (currentTotal > targetBudget)
+{
+result.AppendLine("Analysis:");
+result.AppendLine($"You are currently spending {difference:N0} EUR more than
+the");
+result.AppendLine($"recommended {targetPercentage}% guideline
+({currentPercentage:F1}% vs {targetPercentage}%).
+");
+result.AppendLine("
+---
+");
+result.AppendLine($"To reach {targetPercentage}%, you need to reduce housing
+costs by {difference:N0} EUR/month.
+");
+}
+{
+else if (currentTotal < targetBudget)
+result.AppendLine("Analysis:");
+result.AppendLine($"✓ Good news! You're spending {Math.Abs(difference):N0}
+EUR less than the");
+result.AppendLine($"{targetPercentage}% guideline ({currentPercentage:F1}% vs
+{targetPercentage}%).
+");
+result.AppendLine($"You have {Math.Abs(difference):N0} EUR/month buffer in your
+housing budget.
+");
+}
+else
+{
+result.AppendLine("Analysis:");
+result.AppendLine($"✓ Perfect! You're at exactly {targetPercentage}% of your
+income.
+");
+}
+}
+}
+else
+{
+result.AppendLine("
+---
+");
+result.AppendLine("Note: Current housing expenses not available.
+");
+result.AppendLine("Configure HousingCategoryId to track actual spending.
+");
+}
+return result.ToString();
+}
+[KernelFunction("get
+_
+disposable
+income
+_
+_
+history")]
+[Description("Gets disposable income history for the specified number of months with
+averages.
+")]
+public async Task<string> GetDisposableIncomeHistory(
+[Description("Number of months to analyze")] int months)
+{
+// Calculate the date range for the requested number of months
+var periodTo = DateTimeOffset.UtcNow;
+var periodFrom = periodTo.AddMonths(-months);
+// Create transaction series request to get monthly aggregated data
+var request = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesRequest
+{
+TransactionFilter = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionFilter
+{
+PeriodFrom = periodFrom,
+PeriodTo = periodTo
+},
+Options = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesOptions
+{
+OverTime = true,
+TimeResolution =
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.AggregationLevelEnum.Month
+},
+[
+SeriesSelectors =
+new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionSeriesSelector
+{
+Filter = new
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.TransactionFilter()
+}
+]
+};
+var response = await userApiClient.User.Core.V1.Transactions.Series.PostAsync(request);
+if (response?.Data == null || response.Data.Count == 0 || response.Data[0].Values == null)
+{
+return "No transaction data available for the specified period.
+";
+}
+var series = response.Data[0];
+var monthlyData = series.Values;
+// Build the output
+var output = new System.Text.StringBuilder();
+output.AppendLine($"Disposable Income Analysis (Last {months} Months):");
+output.AppendLine("
+---
+");
+double totalIncome = 0;
+double totalExpenses = 0;
+double totalDisposable = 0;
+int count = 0;
+var sortedData = monthlyData.OrderBy(d => d.Date).ToList();
+foreach (var data in sortedData)
+{
+if (data.Date.HasValue)
+{
+var monthName = data.Date.Value.ToString("MMMM yyyy");
+var income = data.TotalPositive ?? 0;
+var expenses = Math.Abs(data.TotalNegative ?? 0); // Make positive for display
+var disposable = data.NettoAmount ?? 0;
+totalIncome += income;
+totalExpenses += expenses;
+totalDisposable += disposable;
+count++;
+output.AppendLine($"{monthName}:");
+output.AppendLine($"Income: {income:N0} EUR");
+output.AppendLine($"Essential Expenses: {expenses:N0} EUR");
+output.AppendLine($"Disposable Income: {disposable:N0} EUR");
+output.AppendLine("
+---
+");
+}
+}
+// Calculate averages
+var avgDisposable = count > 0 ? totalDisposable / count : 0;
+output.AppendLine("Summary:");
+output.AppendLine($"Total Income ({count} months): {totalIncome:N0} EUR");
+output.AppendLine($"Total Essential Expenses: {totalExpenses:N0} EUR");
+output.AppendLine($"Total Disposable Income: {totalDisposable:N0} EUR");
+output.AppendLine("
+---
+");
+output.AppendLine($"Average Monthly Disposable Income: {avgDisposable:N0} EUR");
+output.AppendLine("
+---
+");
+output.AppendLine("Note: Disposable income = Income minus essential expenses");
+output.AppendLine("(housing, utilities, food, transportation, insurance)");
+return output.ToString();
+}
+[KernelFunction("calculate
+balance
+after
+_
+_
+_
+rent")]
+[Description("Calculates remaining balance until month end after rent payment, considering
+income and other expenses.
+")]
+public async Task<string> CalculateBalanceAfterRent()
+{
+var now = DateTimeOffset.UtcNow;
+var firstDayOfMonth = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0,
+TimeSpan.Zero);
+var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
+// 1. Get current account balance
+var accountsResponse = await userApiClient.User.Core.V1.Accounts.GetAsync();
+var accounts = accountsResponse?.Data ?? [];
+var currentBalance = accounts
+.Where(a => a.AccountCategory == AccountCategoryEnum.Current ||
+a.AccountCategory == AccountCategoryEnum.Savings)
+.Sum(a => a.Balance ?? 0);
+if (currentBalance == 0)
+return "No account balance information available.
+";
+{
+}
+// 2. Get all scheduled payments for this month
+var scheduledPaymentsResponse = await
+userApiClient.User.Core.V1.Futurepayments.Scheduledpayments.GetAsync();
+var allScheduledPayments = scheduledPaymentsResponse?.Data ?? [];
+// 3. Identify rent payment (unpaid, outgoing, due this month or next, contains "rent" in
+description)
+real-world scenarios
+// Note: We include payments from the start of this month (even if overdue) to support
+var rentPayment = allScheduledPayments
+.Where(p => p.IsReceivable == false &&
+p.BookingDate == null &&
+p.DueDate.HasValue &&
+p.DueDate.Value >= firstDayOfMonth && // From start of current month (includes
+overdue)
+p.DueDate.Value <= lastDayOfMonth.AddMonths(1) && // Up to end of next
+month
+(p.PaymentText?.Contains("rent"
+, StringComparison.OrdinalIgnoreCase) ??
+false))
+.OrderBy(p => p.DueDate)
+.FirstOrDefault();
+if (rentPayment == null)
+{
+return $"No upcoming rent payment found for this month. Current balance:
+{currentBalance:N0} EUR.
+";
+}
+var rentAmount = Math.Abs(rentPayment.AmountInCurrency ?? 0);
+var rentDueDate = rentPayment.DueDate!.Value;
+// 4. Get expected income (receivable payments not yet booked, through end of next
+month)
+var expectedIncomePayments = allScheduledPayments
+.Where(p => p.IsReceivable == true &&
+p.BookingDate == null &&
+p.DueDate.HasValue &&
+p.DueDate.Value >= firstDayOfMonth &&
+p.DueDate.Value <= lastDayOfMonth.AddMonths(1))
+.OrderBy(p => p.DueDate)
+.ToList();
+var expectedIncome = expectedIncomePayments.Sum(p => p.AmountInCurrency ?? 0);
+// 5. Get other upcoming bills (excluding rent, through end of next month)
+var otherBills = allScheduledPayments
+.Where(p => p.IsReceivable == false &&
+p.BookingDate == null &&
+p.DueDate.HasValue &&
+p.DueDate.Value >= firstDayOfMonth &&
+p.DueDate.Value <= lastDayOfMonth.AddMonths(1) &&
+p.Id != rentPayment.Id)
+.OrderBy(p => p.DueDate)
+.ToList();
+var otherBillsTotal = otherBills.Sum(p => Math.Abs(p.AmountInCurrency ?? 0));
+// 6. Calculate balances
+var balanceAfterRent = currentBalance - rentAmount;
+var balanceAfterRentAndIncome = balanceAfterRent + expectedIncome;
+var finalBalance = balanceAfterRentAndIncome - otherBillsTotal;
+var daysUntilRent = (rentDueDate.Date - now.Date).Days;
+var daysUntilMonthEnd = (lastDayOfMonth.Date - now.Date).Days;
+// 7. Build detailed response
+var result = new StringBuilder();
+result.AppendLine("Current Balance Analysis:");
+result.AppendLine("
+---
+");
+result.AppendLine($"Current Account Balance: {currentBalance:N0} EUR");
+result.AppendLine($"Date: {now:yyyy-MM-dd}");
+result.AppendLine("
+---
+");
+result.AppendLine("Rent Information:");
+result.AppendLine($"Next Rent Due: {rentDueDate:yyyy-MM-dd} ({rentAmount:N0} EUR)");
+result.AppendLine($"Payment: {rentPayment.PaymentText}");
+result.AppendLine("
+---
+");
+result.AppendLine($"Days Until Rent: {daysUntilRent} days");
+result.AppendLine($"Days Until End of Month: {daysUntilMonthEnd} days");
+if (expectedIncomePayments.Count > 0)
+{
+result.AppendLine("
+---
+");
+result.AppendLine("Expected Income Before Month End:");
+foreach (var income in expectedIncomePayments)
+{
+result.AppendLine($"• {income.PaymentText} ({income.DueDate:MMM dd}):
+{income.AmountInCurrency:N0} EUR");
+}
+result.AppendLine($"Total Expected: {expectedIncome:N0} EUR");
+}
+result.AppendLine("
+---
+");
+result.AppendLine("Calculation:");
+result.AppendLine($"Current Balance: {currentBalance:N0} EUR");
+result.AppendLine($"After Rent Payment: {balanceAfterRent:N0} EUR");
+if (expectedIncome > 0)
+{
+}
+{
+result.AppendLine($"After Salary/Income: {balanceAfterRentAndIncome:N0} EUR");
+if (otherBills.Count > 0)
+result.AppendLine("
+---
+");
+result.AppendLine($"Other Committed Expenses ({rentDueDate:MMM
+dd}-{lastDayOfMonth:MMM dd}):");
+foreach (var bill in otherBills)
+{
+result.AppendLine($"• {bill.PaymentText} ({bill.DueDate:MMM dd}):
+{Math.Abs(bill.AmountInCurrency ?? 0):N0} EUR");
+}
+result.AppendLine($"Total Other: {otherBillsTotal:N0} EUR");
+}
+result.AppendLine("
+---
+");
+result.AppendLine("Available Until End of Month:");
+result.AppendLine($"After Rent Only: {balanceAfterRent:N0} EUR (before salary)");
+if (expectedIncome > 0)
+{
+result.AppendLine($"After Rent + Salary: {balanceAfterRentAndIncome:N0} EUR");
+}
+if (otherBillsTotal > 0)
+{
+result.AppendLine($"After All Committed Expenses: {finalBalance:N0} EUR");
+}
+result.AppendLine("
+---
+");
+if (finalBalance > 0)
+{
+result.AppendLine($"Recommendation: You'll have {finalBalance:N0} EUR available");
+result.AppendLine("for discretionary spending until month end after");
+result.AppendLine("rent and all other committed expenses.
+");
+}
+{
+else if (balanceAfterRent > 0)
+result.AppendLine($"Recommendation: After rent, you'll have {balanceAfterRent:N0}
+EUR available.
+");
+}
+else
+{
+result.AppendLine($"⚠ Warning: Your balance after rent will be {balanceAfterRent:N0}
+EUR.
+");
+result.AppendLine("You may need additional funds to cover all expenses.
+");
+}
+return result.ToString();
+}
+[KernelFunction("calculate
+available
+_
+_
+spending")]
+[Description("Calculates how much can be spent without going into overdraft, considering
+upcoming bills and income.
+")]
+public async Task<string> CalculateAvailableSpending()
+{
+var now = DateTimeOffset.UtcNow;
+var firstDayOfMonth = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0,
+TimeSpan.Zero);
+var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
+// 1. Get current account balances and overdraft limits
+var accountsResponse = await userApiClient.User.Core.V1.Accounts.GetAsync();
+var accounts = accountsResponse?.Data ?? [];
+// Get current and savings accounts
+var spendableAccounts = accounts
+.Where(a => a.AccountCategory == AccountCategoryEnum.Current ||
+a.AccountCategory == AccountCategoryEnum.Savings)
+.ToList();
+if (spendableAccounts.Count == 0)
+{
+return "No account information available.
+";
+}
+var currentBalance = spendableAccounts.Sum(a => a.Balance ?? 0);
+// Get overdraft limit from current account(s)
+var overdraftLimit = accounts
+.Where(a => a.AccountCategory == AccountCategoryEnum.Current)
+.Sum(a => a.Limit ?? 0);
+var totalAvailable = currentBalance + overdraftLimit;
+// 2. Get scheduled payments for upcoming period
+var scheduledPaymentsResponse = await
+userApiClient.User.Core.V1.Futurepayments.Scheduledpayments.GetAsync();
+var allScheduledPayments = scheduledPaymentsResponse?.Data ?? [];
+// 3. Get upcoming bills (unpaid, outgoing)
+var upcomingBills = allScheduledPayments
+.Where(p => p.IsReceivable == false &&
+p.BookingDate == null &&
+p.DueDate.HasValue &&
+p.DueDate.Value >= firstDayOfMonth &&
+p.DueDate.Value <= lastDayOfMonth.AddMonths(1))
+.OrderBy(p => p.DueDate)
+.ToList();
+var totalBills = upcomingBills.Sum(p => Math.Abs(p.AmountInCurrency ?? 0));
+// 4. Get expected income
+var expectedIncomePayments = allScheduledPayments
+.Where(p => p.IsReceivable == true &&
+p.BookingDate == null &&
+p.DueDate.HasValue &&
+p.DueDate.Value >= firstDayOfMonth &&
+p.DueDate.Value <= lastDayOfMonth.AddMonths(1))
+.OrderBy(p => p.DueDate)
+.ToList();
+var expectedIncome = expectedIncomePayments.Sum(p => p.AmountInCurrency ?? 0);
+// 5. Calculate spending capacity (before income arrives)
+var netAvailableBeforeSalary = currentBalance - totalBills;
+// Calculate safe spending amounts with different buffer levels
+var conservativeBuffer = 500.0;
+var moderateBuffer = 200.0;
+var conservativeSpending = Math.Max(0, netAvailableBeforeSalary - conservativeBuffer);
+var moderateSpending = Math.Max(0, netAvailableBeforeSalary - moderateBuffer);
+var maximumSpending = Math.Max(0, netAvailableBeforeSalary);
+// After income calculations
+var balanceAfterSalary = currentBalance + expectedIncome;
+var balanceAfterAllExpenses = balanceAfterSalary - totalBills;
+// 6. Build detailed response
+var result = new StringBuilder();
+result.AppendLine("Available Spending Analysis:");
+result.AppendLine("
+---
+");
+result.AppendLine($"Current Account Balance: {currentBalance:N0} EUR");
+if (overdraftLimit > 0)
+{
+result.AppendLine($"Overdraft Limit: {overdraftLimit:N0} EUR");
+result.AppendLine($"Total Available: {totalAvailable:N0} EUR");
+}
+else
+{
+}
+{
+result.AppendLine("Overdraft Limit: Not available");
+if (upcomingBills.Count > 0)
+result.AppendLine("
+---
+");
+result.AppendLine("Committed Expenses:");
+foreach (var bill in upcomingBills)
+{
+result.AppendLine($"• {bill.PaymentText} ({bill.DueDate:MMM dd}):
+{Math.Abs(bill.AmountInCurrency ?? 0):N0} EUR");
+}
+result.AppendLine($"Total Committed: {totalBills:N0} EUR");
+}
+{
+if (expectedIncomePayments.Count > 0)
+result.AppendLine("
+---
+");
+result.AppendLine("Expected Income:");
+foreach (var income in expectedIncomePayments)
+{
+result.AppendLine($"• {income.PaymentText} ({income.DueDate:MMM dd}):
+{income.AmountInCurrency:N0} EUR");
+}
+result.AppendLine($"Total Expected: {expectedIncome:N0} EUR");
+}
+result.AppendLine("
+---
+");
+result.AppendLine("Calculation (Before Salary Arrives):");
+result.AppendLine($"Current Balance: {currentBalance:N0} EUR");
+result.AppendLine($"Less Committed Expenses: -{totalBills:N0} EUR");
+result.AppendLine($"Net Available: {netAvailableBeforeSalary:N0} EUR");
+result.AppendLine("
+---
+");
+result.AppendLine("Safe Spending Recommendations:");
+result.AppendLine($"Conservative ({conservativeBuffer:N0} EUR buffer):
+{conservativeSpending:N0} EUR");
+result.AppendLine($"Moderate ({moderateBuffer:N0} EUR buffer): {moderateSpending:N0}
+EUR ✓ RECOMMENDED");
+result.AppendLine($"Maximum (no buffer): {maximumSpending:N0} EUR ⚠");
+if (expectedIncome > 0)
+{
+result.AppendLine("
+---
+");
+result.AppendLine("After Salary (Projected):");
+result.AppendLine($"Balance after salary: {balanceAfterSalary:N0} EUR");
+result.AppendLine($"After all expenses: {balanceAfterAllExpenses:N0} EUR");
+}
+result.AppendLine("
+---
+");
+if (netAvailableBeforeSalary < 0)
+{
+result.AppendLine($"⚠ Warning: Your committed expenses exceed your current
+balance by {Math.Abs(netAvailableBeforeSalary):N0} EUR.
+");
+if (overdraftLimit > 0 && Math.Abs(netAvailableBeforeSalary) <= overdraftLimit)
+{
+result.AppendLine($"You have {overdraftLimit:N0} EUR overdraft available to cover
+the shortfall.
+");
+}
+{
+else
+result.AppendLine("You may need to delay some expenses or ensure income arrives
+on time.
+");
+}
+}
+{
+else if (moderateSpending > 0)
+result.AppendLine($"Recommendation: You can safely spend {moderateSpending:N0}
+EUR this month");
+safety buffer.
+");
+}
+else
+{
+result.AppendLine($"without risking overdraft, maintaining a {moderateBuffer:N0} EUR
+result.AppendLine($"Recommendation: Focus on essential expenses only.
+");
+result.AppendLine($"Your available balance after bills is {netAvailableBeforeSalary:N0}
+EUR.
+");
+}
+return result.ToString();
+}
+//[KernelFunction("get
+bill
+_
+_
+coverage
+_
+report")]
+//[Description("Analyzes current balance and upcoming bills to determine if there are sufficient
+funds.
+")]
+//public string GetBillCoverageReport()
+//{
+// return """
+// Bill Coverage Analysis:
+// ---
+// Current Account Balance: 3,450 EUR
+// Available Credit: 5,000 EUR
+// ---
+// Upcoming Bills (October 2025):
+// ---
+// Paid Bills:
+// ✓ Electricity (Oct 5): 120 EUR
+// ✓ Internet (Oct 8): 45 EUR
+// ---
+// Pending Bills:
+// • Rent (Oct 25): 1,200 EUR
+// • Credit Card Payment (Oct 28): 450 EUR
+// • Phone Bill (Oct 30): 35 EUR
+// • Insurance (Oct 31): 200 EUR
+// • Gym Membership (Oct 28): 45 EUR
+// ---
+// Total Pending Bills: 1,930 EUR
+// ---
+// Expected Income Before Month End:
+// Salary (Oct 25): 5,000 EUR
+// ---
+// Analysis:
+// Current Balance: 3,450 EUR
+// Total Pending Bills: 1,930 EUR
+// Balance After Bills (before salary): 1,520 EUR ✓
+// Balance After Bills (after salary): 6,520 EUR ✓
+// ---
+// Status: YES - You have enough to cover all bills
+// Safety Margin: 1,520 EUR (before salary)
+}
+// """;
+//}
+
+
+---
+
+using System.ComponentModel;
+using System.Text;
+using Meniga.Clients.UserApi;
+using Microsoft.SemanticKernel;
+namespace Meniga.AI.Plugins;
+/// <summary>
+/// Provides account balance and card information functions.
+/// </summary>
+public sealed class Account(UserApiClient userApiClient)
+{
+[KernelFunction("get
+_
+balance")]
+[Description("Gets the balances for all cards and accounts of the user.
+")]
+public async Task<string> GetBalance()
+{
+var accountsResponse = await userApiClient.User.Core.V1.Accounts.GetAsync();
+var accounts = accountsResponse?.Data ?? [];
+if (accounts.Count == 0)
+{
+return "No accounts found.
+";
+}
+var result = new StringBuilder();
+double total = 0;
+foreach (var account in accounts)
+{
+result.AppendLine($"{account.Name}");
+result.AppendLine($"{account.Balance:N0} {account.CurrencyCode ?? "EUR"}");
+result.AppendLine("
+---
+");
+total += account.Balance ?? 0;
+}
+result.AppendLine($"Total: {total:N0} EUR");
+return result.ToString();
+}
+[KernelFunction("check
+bills
+_
+_
+coverage")]
+[Description("Checks if the user has enough money in their accounts to cover upcoming bills
+for the current month.
+")]
+public async Task<string> CheckBillsCoverage()
+{
+var now = DateTimeOffset.UtcNow;
+var firstDayOfMonth = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0,
+TimeSpan.Zero);
+var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
+// Get account balances
+var accountsResponse = await userApiClient.User.Core.V1.Accounts.GetAsync();
+var accounts = accountsResponse?.Data ?? [];
+// Calculate total available balance (from current/checking accounts)
+var totalBalance = accounts
+.Where(a => a.AccountCategory ==
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.AccountCategoryEnum.Current ||
+a.AccountCategory ==
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.AccountCategoryEnum.Savings)
+.Sum(a => a.Balance ?? 0);
+// Get scheduled payments for this month
+var scheduledPaymentsResponse = await
+userApiClient.User.Core.V1.Futurepayments.Scheduledpayments.GetAsync();
+var allScheduledPayments = scheduledPaymentsResponse?.Data ?? [];
+// Filter for unpaid bills due this month
+var upcomingBills = allScheduledPayments
+.Where(p => p.IsReceivable == false && // Outgoing payments (bills)
+p.BookingDate == null && // Not yet paid
+p.DueDate.HasValue &&
+p.DueDate.Value >= firstDayOfMonth &&
+p.DueDate.Value <= lastDayOfMonth)
+.OrderBy(p => p.DueDate)
+.ToList();
+var totalBills = upcomingBills.Sum(p => Math.Abs(p.AmountInCurrency ?? 0));
+var remaining = totalBalance - totalBills;
+var hasEnough = totalBalance >= totalBills;
+// Build response
+var result = new StringBuilder();
+result.AppendLine($"Account Balance: {totalBalance:N2} EUR");
+result.AppendLine("
+---
+");
+result.AppendLine("Upcoming Bills This Month:");
+if (upcomingBills.Count == 0)
+{
+}
+else
+{
+result.AppendLine("No scheduled bills found for this month.
+");
+foreach (var bill in upcomingBills)
+{
+result.AppendLine($"• {bill.PaymentText}: {Math.Abs(bill.AmountInCurrency ?? 0):N2}
+EUR (Due: {bill.DueDate:MMM dd})");
+}
+result.AppendLine("
+---
+");
+result.AppendLine($"Total Bills: {totalBills:N2} EUR");
+}
+result.AppendLine("
+---
+");
+if (hasEnough)
+{
+result.AppendLine($"✓ Yes, you have enough to cover your bills.
+");
+result.AppendLine($"After paying bills, you'll have {remaining:N2} EUR remaining.
+");
+}
+else
+{
+result.AppendLine($"✗ No, you're short by {Math.Abs(remaining):N2} EUR.
+");
+result.AppendLine($"You need an additional {Math.Abs(remaining):N2} EUR to cover all
+bills.
+");
+}
+return result.ToString();
+}
+[KernelFunction("get
+cards
+_
+_
+summary")]
+[Description("Gets the information about the cards of the user including their fees.
+")]
+public async Task<string> GetCardsSummary()
+{
+// Get all accounts
+var accountsResponse = await userApiClient.User.Core.V1.Accounts.GetAsync();
+var accounts = accountsResponse?.Data ?? [];
+// Filter for card accounts (credit cards and debit cards)
+// Credit cards are typically AccountCategory.Credit
+// Debit cards might be in Current category but have card-related metadata
+var cardAccounts = accounts
+.Where(a => a.AccountCategory ==
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.AccountCategoryEnum.Credit ||
+(a.Metadata != null && a.Metadata.Any(m => m.Name == "annual
+_
+fee" || m.Name
+== "monthly_
+fee")))
+.ToList();
+if (cardAccounts.Count == 0)
+return "No card accounts found.
+";
+{
+}
+var result = new StringBuilder();
+result.AppendLine("Card Fee Summary:");
+result.AppendLine("
+---
+");
+double totalAnnualFees = 0;
+double totalMonthlyFees = 0;
+foreach (var account in cardAccounts.OrderBy(a => a.Name))
+{
+var metadata = account.Metadata ?? [];
+// Extract fee information from metadata
+var annualFeeMetadata = metadata.FirstOrDefault(m => m.Name == "annual
+_
+fee");
+var monthlyFeeMetadata = metadata.FirstOrDefault(m => m.Name == "monthly_
+fee");
+double annualFee = 0;
+double monthlyFee = 0;
+// Parse annual fee
+if (annualFeeMetadata?.Value != null && double.TryParse(annualFeeMetadata.Value,
+out var parsedAnnual))
+{
+annualFee = parsedAnnual;
+}
+// Parse monthly fee
+if (monthlyFeeMetadata?.Value != null && double.TryParse(monthlyFeeMetadata.Value,
+out var parsedMonthly))
+{
+monthlyFee = parsedMonthly;
+}
+// If both fees are available, show the card
+if (annualFeeMetadata != null || monthlyFeeMetadata != null)
+{
+// Extract card name (remove "Credit Card" or "Debit Card" prefix if present)
+var cardName = account.Name ?? "Unknown Card";
+result.AppendLine($"{cardName}");
+result.AppendLine($"Annual Fee: {annualFee:N0} EUR");
+result.AppendLine($"Monthly Fee: {monthlyFee:N0} EUR");
+result.AppendLine("
+---
+");
+totalAnnualFees += annualFee;
+totalMonthlyFees += monthlyFee;
+}
+else
+{
+// Card found but no fee metadata
+result.AppendLine($"{account.Name ?? "Unknown Card"}");
+result.AppendLine("Fee information not available");
+result.AppendLine("
+---
+");
+}
+}
+// Add summary totals if we have multiple cards
+if (cardAccounts.Count > 1)
+{
+result.AppendLine($"Total Annual Fees: {totalAnnualFees:N0} EUR");
+result.AppendLine($"Total Monthly Fees: {totalMonthlyFees:N0} EUR");
+result.AppendLine($"Total Yearly Cost: {(totalAnnualFees + (totalMonthlyFees * 12)):N0}
+EUR");
+}
+return result.ToString();
+}
+[KernelFunction("get
+withdrawal
+_
+_
+limits")]
+[Description("Gets available balance and withdrawal limits for all accounts and cards.
+")]
+public async Task<string> GetWithdrawalLimits()
+{
+// Get all accounts
+var accountsResponse = await userApiClient.User.Core.V1.Accounts.GetAsync();
+var accounts = accountsResponse?.Data ?? [];
+if (accounts.Count == 0)
+{
+return "No accounts found.
+";
+}
+var result = new StringBuilder();
+result.AppendLine("Available Withdrawal Limits:");
+result.AppendLine("
+---
+");
+double totalAvailableFunds = 0;
+double totalCreditAvailable = 0;
+double maxAtmLimit = 0;
+string? maxAtmAccount = null;
+double totalCashAdvance = 0;
+// Process each account
+foreach (var account in accounts.OrderBy(a => a.AccountCategory).ThenBy(a =>
+a.Name))
+{
+var metadata = account.Metadata ?? [];
+"cash
+"cash
+"linked
+// Extract metadata values
+var atmLimitMeta = metadata.FirstOrDefault(m => m.Name == "atm
+_
+daily_
+limit");
+var posLimitMeta = metadata.FirstOrDefault(m => m.Name == "pos
+_
+daily_
+limit");
+var cashAdvanceLimitMeta = metadata.FirstOrDefault(m => m.Name ==
+advance
+_
+_
+limit");
+var cashAdvanceFeeMeta = metadata.FirstOrDefault(m => m.Name ==
+advance
+_
+_
+fee");
+var linkedAccountIdMeta = metadata.FirstOrDefault(m => m.Name ==
+account
+_
+_
+id");
+double atmLimit = 0;
+double posLimit = 0;
+double cashAdvanceLimit = 0;
+double cashAdvanceFee = 0;
+long? linkedAccountId = null;
+// Parse metadata
+if (atmLimitMeta?.Value != null && double.TryParse(atmLimitMeta.Value, out var
+parsedAtm))
+atmLimit = parsedAtm;
+if (posLimitMeta?.Value != null && double.TryParse(posLimitMeta.Value, out var
+parsedPos))
+posLimit = parsedPos;
+if (cashAdvanceLimitMeta?.Value != null &&
+double.TryParse(cashAdvanceLimitMeta.Value, out var parsedCashAdv))
+cashAdvanceLimit = parsedCashAdv;
+if (cashAdvanceFeeMeta?.Value != null &&
+double.TryParse(cashAdvanceFeeMeta.Value, out var parsedFee))
+cashAdvanceFee = parsedFee;
+if (linkedAccountIdMeta?.Value != null && long.TryParse(linkedAccountIdMeta.Value, out
+var parsedLinked))
+linkedAccountId = parsedLinked;
+// Determine account type and calculate available funds
+if (account.AccountCategory ==
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.AccountCategoryEnum.Current ||
+account.AccountCategory ==
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.AccountCategoryEnum.Savings)
+{
+// Current/Savings account
+var balance = account.Balance ?? 0;
+var available = balance;
+// Check if this is a linked card (debit card)
+if (linkedAccountId.HasValue)
+{
+// This is a debit card linked to another account
+var linkedAccount = accounts.FirstOrDefault(a => a.Id == linkedAccountId.Value);
+var linkedBalance = linkedAccount?.Balance ?? 0;
+result.AppendLine($"{account.Name}");
+result.AppendLine("Linked to Current Account");
+result.AppendLine($"Available: {linkedBalance:N0} EUR");
+if (atmLimit > 0)
+result.AppendLine($"Daily ATM Limit: {atmLimit:N0} EUR");
+if (posLimit > 0)
+result.AppendLine($"Daily POS Limit: {posLimit:N0} EUR");
+result.AppendLine("
+---
+");
+// Track max ATM limit
+if (atmLimit > maxAtmLimit)
+{
+maxAtmLimit = atmLimit;
+maxAtmAccount = account.Name;
+}
+}
+else
+{
+// Regular current/savings account
+result.AppendLine($"{account.Name}");
+result.AppendLine($"Balance: {balance:N0} EUR");
+result.AppendLine($"Available for Withdrawal: {available:N0} EUR");
+if (atmLimit > 0)
+result.AppendLine($"Daily ATM Limit: {atmLimit:N0} EUR");
+if (posLimit > 0)
+result.AppendLine($"Daily POS Limit: {posLimit:N0} EUR");
+result.AppendLine("
+---
+");
+totalAvailableFunds += available;
+// Track max ATM limit
+if (atmLimit > maxAtmLimit)
+{
+maxAtmLimit = atmLimit;
+maxAtmAccount = account.Name;
+}
+}
+}
+else if (account.AccountCategory ==
+Meniga.Clients.UserApi.Models.Meniga.Core.Api.Models.AccountCategoryEnum.Credit)
+{
+// Credit card
+var balance = account.Balance ?? 0;
+var creditLimit = account.Limit ?? 0;
+var availableCredit = creditLimit - Math.Abs(balance);
+result.AppendLine($"{account.Name}");
+result.AppendLine($"Available Credit: {availableCredit:N0} EUR");
+if (cashAdvanceLimit > 0)
+{
+var actualCashAdvance = Math.Min(cashAdvanceLimit, availableCredit);
+result.AppendLine($"Cash Advance Limit: {cashAdvanceLimit:N0} EUR");
+totalCashAdvance += actualCashAdvance;
+}
+if (atmLimit > 0)
+result.AppendLine($"Daily ATM Limit: {atmLimit:N0} EUR");
+if (posLimit > 0)
+result.AppendLine($"Daily POS Limit: {posLimit:N0} EUR");
+if (cashAdvanceFee > 0)
+result.AppendLine($"Cash Advance Fee: {cashAdvanceFee:F1}%");
+result.AppendLine("
+---
+");
+totalCreditAvailable += availableCredit;
+// Track max ATM limit for credit cards too
+if (atmLimit > 0 && atmLimit > maxAtmLimit)
+{
+maxAtmLimit = atmLimit;
+maxAtmAccount = account.Name;
+}
+}
+}
+// Add summary
+result.AppendLine("Summary:");
+result.AppendLine($"Total Available Funds (without credit): {totalAvailableFunds:N0}
+EUR");
+{
+if (totalCreditAvailable > 0)
+var totalWithCredit = totalAvailableFunds + totalCreditAvailable;
+result.AppendLine($"Total with Credit Lines: {totalWithCredit:N0} EUR");
+}
+if (maxAtmLimit > 0)
+{
+result.AppendLine($"Maximum Cash Withdrawal Today (ATM): {maxAtmLimit:N0} EUR
+({maxAtmAccount})");
+}
+if (totalCashAdvance > 0)
+{
+result.AppendLine($"Maximum Cash Advance Available: {totalCashAdvance:N0} EUR
+(from credit cards)");
+}
+// Add recommendations
+result.AppendLine("
+---
+");
+result.AppendLine("Recommendations:");
+result.AppendLine("• For purchases, use debit/credit cards (no fees)");
+if (maxAtmLimit > 0)
+{
+result.AppendLine($"• For cash needs up to {maxAtmLimit:N0} EUR, use Current
+Account ATM card");
+result.AppendLine("• For larger amounts, visit branch or use bank transfer");
+return result.ToString();
+}
+}
+}
+{
+if (totalCashAdvance > 0)
+result.AppendLine("• Avoid cash advances if possible (fees apply)");
+}
